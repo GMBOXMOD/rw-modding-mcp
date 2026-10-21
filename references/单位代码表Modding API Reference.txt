@@ -1,0 +1,6426 @@
+单位代码
+总说明：[section] 节，name:value 键/代码：值，参数。便于习惯，一般称为代码而不是键。翻译一般为键。在铁锈战争游戏中也可用使用=，但不是所有:都可以用=代替。建议根据例子使用。注意代码中除了注释和描述文本，所有符号都为英文符号。许多布尔值的true和false可以写成1或0，但不建议这么做。
+
+章节索引：
+A：核心[core]、B：可建造[canBuild_NAME]、C：图像[graphics]、D：攻击[attack]、E：炮塔[turret_NAME（非必要请填1-31的数字）]、F：抛射体[projectile_NAME]、G：运动[movement]、H：AI[ai]、I：腿脚/胳膊[leg_#] / [arm_#]、J：附属[attachment_NAME]、K：效果[effect_NAME]、L：动画[animation_NAME]、M：行动/隐藏行动[action_NAME] / [hiddenAction_NAME]、N：放置规则[placementRule_NAME]、O：全局资源[global_resource_NAME]、P：局部资源[resource_NAME]、Q：贴图/贴花[decal_NAME]、R：模板[template_NAME]、S：注释[comment_NAME]、T：模组[mod]、U：音乐[music]
+
+A：核心[core]
+A-a：通用代码、A-b：单位统计代码、A-c：UI和图形代码、A-d：仅构建代码、A-e：杂项代码、A-f：运输代码、A-g：资源节点代码、A-h：资源收集器代码、A-i：建筑和工厂代码、A-j：死亡代码、A-k：动作代码、A-l：不建议使用的代码
+
+A-a：通用代码
+分类说明：多是必要的代码，如果不包括这些，可能导致错误
+
+A-a-1：name（名字）
+描述：定义单位原始名称，可以是中文。游戏使用它区分其它单位。如果没有在displayText或者语言文件设置显示名称，那么它也将作为单位的显示名称。；具体描述文件位置:assets/translationsStrings_zh.properties格式:units.单位名称.name=写单位显示的名称；units.单位名称.description= [[填单位显示的描述]]
+约束：名称不能是 self；名称不能以 self. 开头
+正确例子：name:customTank1；name:自定义坦克；name:shibainu
+错误例子：name:self；name:self.name
+值类型：string
+
+A-a-2：altNames（别名）
+描述：以逗号分隔的名称列表。像名称一样，但优先级较低，对于启用多个自定义mod有用。
+正确例子：altNames:custTank1,customTank1,cTank1
+值类型：string(s)
+
+A-a-3：class（类）
+描述：无实际用处，可以删除。Luke说：保留供将来使用，默认情况下最好为CustomUnitMetadata。
+正确例子：class: CustomUnitMetadata
+值类型：string
+
+A-a-4：strictLevel（严格级别）
+描述：默认值为0，忽略代码重复。设为1时如果当前单位内有重复代码，则报错。建议添加到"all-units.template"以应用于所有单位,进行统一查错。
+正确例子：strictLevel:1
+值类型：integer
+
+A-a-5：price（价格）
+描述：设定单位造价，可以是负数，负数时直接提供资金。
+正确例子：price: 500
+值类型：price(s)
+
+A-a-6：mass（质量）
+描述：单位的“重量”定义了它与其他单位的碰撞方式，值越大，推动就越困难。
+正确例子：mass: 3000
+值类型：integer
+
+A-a-7：techLevel（科技等级）
+描述：设置单位的科技等级，共有3个级别，1级GUI显示为绿色，2、3级显示为黄色。
+正确例子：techLevel: 1
+值类型：integer
+
+A-a-8：buildSpeed（建造速度）
+描述：建造此单位需要的时间，填秒。以前的计算方式为：此处所填时间=1÷(60x您需要的秒)如果定义了工厂速率则需要乘以建造乘数。
+正确例子：buildSpeed: 3s
+值类型：time
+
+A-a-9：radius（半径）
+描述：单位的实际碰擦体积，也是实际的可选择范围。其光圈在displayRadius覆盖时真实体积不变。
+正确例子：radius: 20
+值类型：integer
+
+A-a-10：isBio（是生物）
+描述：此单位是否为生物，为生物则影响死亡声音和血迹（图像在drawable/blood_mark.png，hideScorchMark：true时可以隐藏）非生物则为黑色爆炸效果。
+正确例子：isBio: true
+值类型：boolean
+
+A-a-11：isBug（是虫子）
+描述：是否为虫子，用于沙盒中的单独分类。
+正确例子：isBug: false
+值类型：boolean
+
+A-a-12：isBuilder（是建造者）
+描述：若需要此单位建造建筑物，则通常需要此代码。并且默认设为[ai] useAsBuilder。
+正确例子：isBuilder: true
+值类型：boolean
+
+A-a-13：streamingCost（流式造价）
+描述：就像价格，但在建造时逐渐消耗资金，如果在构建过程中资源耗尽，建造或生产队列将暂停。就像是红警中那样。铁锈默认是预先扣除资金。
+正确例子：streamingCost:100
+值类型：price(s)
+
+A-a-14：switchPriceWithStreamingCost（切换价格为流式造价）
+描述：快捷设置为默认资金消耗方式或为流式建造方式。建议使用模板快速将一个模组为所有单位切换流资源。
+正确例子：switchPriceWithStreamingCost:true
+值类型：boolean
+
+A-b：单位统计代码
+
+A-b-1：maxHp（生命值）
+描述：单位最大生命值，默认生成时即为此值。
+正确例子：maxHp: 200
+值类型：integer
+
+A-b-2：selfRegenRate（生命恢复速度）
+描述：此数值决定每帧增加血量。游戏内默认速度下，一秒为60逻辑帧，而您看到的FPS帧数为渲染帧，所以电脑上几百帧和手机上60帧和省电模式下30帧并不影响计算。所以不要写太大。可以写负值用于自毁。
+正确例子：selfRegenRate: 0.01
+值类型：float
+
+A-b-3：maxShield（护盾值）
+描述：单位最大护盾值，默认生成时即为此值。如果设置了startShieldAtZero:true，则初始为0.
+正确例子：maxShield: 500
+值类型：integer
+
+A-b-4：startShieldAtZero（护盾初始为0）
+描述：如果为true，则单位护盾值从0开始增加。
+正确例子：startShieldAtZero: true
+值类型：boolean
+
+A-b-5：shieldRegen（护盾恢复速度）
+描述：此数值决定每帧增加护盾值，游戏内一秒为60帧，所以不要写太大。可以写负值。（默认值为0.25）
+正确例子：shieldRegen: 0.15
+值类型：float
+
+A-b-6：energyMax（能量值）
+描述：默认值为0。可以用作炮塔，激光防御和行动的弹药的能量。
+正确例子：energyMax: 1
+值类型：float
+
+A-b-7：startEnergyAtZero（能量初始为0）
+描述：如果为true，则单位能量值从0开始增加。
+正确例子：startEnergyAtZero: true
+值类型：boolean
+
+A-b-8：energyRegen（能量恢复速度）
+描述：能量每帧恢复速度，游戏内一秒为60帧，所以不要写太大。可以写负值。
+正确例子：energyRegen: 0.01
+值类型：float
+
+A-b-9：energyRegenWhenRecharging（充能时能量恢复速度）
+描述：能量恢复是持续的，如果您设置了energyNeedsToRechargeToFull，那么攻击时按energyRegen恢复，耗尽时的灰条按此处设定值恢复。
+正确例子：energyRegenWhenRecharging:0.1
+值类型：float
+
+A-b-10：energyStartingPercentage（能量初始百分比）
+描述：单位生成时所携带的能量百分比。
+正确例子：energyStartingPercentage: 0.5
+值类型：float
+
+A-b-11：energyNeedsToRechargeToFull（能量需要充满）
+描述：若果能量耗尽，则需要完全充能才能进行攻击。
+正确例子：energyNeedsToRechargeToFull: true
+值类型：boolean
+
+A-b-12：energyDisplayName（能量显示名称）
+描述：能量显示名称,目前似乎无效.1.15
+正确例子：energyDisplayName:chemms
+值类型：string
+
+A-b-13：armour（装甲）
+描述：抵消敌方攻击所造成的伤害。
+正确例子：armour: 6
+值类型：float
+
+A-b-14：armourMinDamageToKeep（装甲最低伤害）
+描述：至少造成多少点伤害，默认为1.防止护甲太高完全打不动。
+正确例子：armourMinDamageToKeep: 2
+值类型：float
+
+A-b-15：borrowResourcesWhileAlive（资源活着时借用）
+描述：创建时获取这些资源，删除或销毁时将其返回。例如用于电力逻辑，负数供电和正数耗电。
+正确例子：borrowResourcesWhileAlive: gold=10
+值类型：price(s)
+
+A-b-16：borrowResourcesWhileBuilt（资源在单位建成后借用）
+描述：类似于[core]borrowResourcesWhileAlive但在单位建成后才会生效。主要对房屋之类的建筑有用，这些建筑有负的资源，可以加到单位上限等
+正确例子：borrowResourcesWhileBuilt:gold=100
+值类型：price(s)
+
+A-b-17：generation_resources（资源获取）
+描述：单位定时获得的资源，可自定义资源。
+正确例子：generation_resources: credits=5, gold=20
+值类型：price(s)
+
+A-b-18：generation_active（资源取得条件）
+描述：获取资源条件。可用于受损时无法产出。
+正确例子：generation_active: if not self.hp(lessThan=100)
+值类型：logicbooleanean
+
+A-b-19：generation_credits（资金获取）
+描述：生成资源，仅用于默认的资金，也就是铁锈默认的金钱。
+正确例子：generation_credits: 2
+值类型：integer
+
+A-b-20：generation_delay（资金获取时间）
+描述：多久帧添加一次资源（generation_credits 指定数值）。默认值为40；游戏逻辑帧率按60帧/秒计算，因此默认约为0.67秒。Luke不建议使用。
+正确例子：generation_delay: 40
+值类型：integer
+
+A-c：UI和图形代码
+
+A-c-1：showInEditor（显示在沙盒中）
+描述：设置为false可在沙箱编辑器中隐藏此单位。 （默认为true）
+正确例子：showInEditor: false
+值类型：boolean
+
+A-c-2：displayText（界面显示名称）
+描述：默认单位显示给玩家的单位名称。不填则显示core下的单位name。此条目依据语言设定不同会被下一条覆盖。
+约束：不支持 %{...} 动态逻辑插值
+正确例子：displayText: Custom Tank
+错误例子：displayText:%{self.hp}
+值类型：string
+
+A-c-3：displayText_[Language]（界面显示文本多语言）
+描述：为单位名称添加多语言支持。此方法并不方便，不如设置游戏内部语言文件，建议催luke改。zh(中文通用) zh-cn(简体) zh-tw(台湾) zh-hk中文(香港) en(英语通用) ru(俄语) 其它自查(此列表并不全)，不过您应该不会闲着支持这么多语言。西班牙语（西班牙）es-ES、葡萄牙语（葡萄牙）pt-PT、日语ja、阿姆哈拉语am、爱沙尼亚语et、保加利亚语bg、冰岛语is、波兰语pl、丹麦语da、德语de、法语（法国）fr-FR、法语（加拿大）fr-CA、菲律宾语fil、芬兰语fi、韩语ko、荷兰语nl、加泰罗尼亚语ca、捷克语cs、克罗地亚语hr、拉脱维亚语lv、立陶宛语lt、罗马尼亚语ro、马来语ms、南非荷兰语af、挪威语no、葡萄牙语（巴西）pt-BR、瑞典语sv、塞尔维亚语sr、斯洛伐克语sk、斯洛文尼亚语sl、斯瓦希里语sw、泰语th、土耳其语tr、乌克兰语uk、西班牙语（拉丁美洲）es-419、希伯来语he、希腊语el、匈牙利语hu、意大利语it、印地语hi、印度尼西亚语id in、英语（美国）en-US、英语（英国）en-GB、越南语vi、祖鲁语zu
+约束：不支持 %{...} 动态逻辑插值
+正确例子：displayText_es: Tanque Personalizado；displayText_zh:中文名
+错误例子：displayText_zh:%{self.hp}
+值类型：string
+
+A-c-4：displayDescription（界面显示描述）
+描述：单位显示给玩家的单位描述。
+约束：不支持 %{...} 动态逻辑插值
+正确例子：displayDescription:-Fast movement\n炮灰
+错误例子：displayDescription:%{self.hp}
+值类型：string
+
+A-c-5：displayDescription_[Language]（界面显示描述_其它语言）
+描述：为单位描述添加多语言支持。此方法并不方便，不如设置游戏内部语言文件，建议催luke改。地区码见上。
+约束：不支持 %{...} 动态逻辑插值
+正确例子：displayDescription_es: -Movimiento rápido\n-Daño ligero
+错误例子：displayDescription_zh:%{self.hp}
+值类型：string
+
+A-c-6：displayLocaleKey（界面显示内部调用）
+描述：调用内部语言文件的单位名称和说明的翻译文件。
+正确例子：displayLocaleKey: units.mechArtillery
+值类型：location
+
+A-c-7：displayRadius（单位选择时显示圆圈）
+描述：修改选择单位时显示的绿色圆圈，不更改实际碰撞(radius)和可选择范围。
+正确例子：displayRadius: 20
+值类型：integer
+
+A-c-8：uiTargetRadius（为目标时半径）
+描述：默认值为displayRadius。当攻击/回收/等等这个单位使用半径
+正确例子：uiTargetRadius:20
+值类型：float
+
+A-c-9：shieldRenderRadius（单位护盾显示半径）
+描述：护盾绘制半径，默认值比半径大一点。可以设置在单位上显示更大或更小的护盾圈。
+正确例子：shieldRenderRadius: 12
+值类型：integer
+
+A-c-10：shieldDisplayOnlyDeflection（护盾只在受攻击时显示）
+描述：隐藏护盾，只在受到攻击时显示。
+正确例子：shieldDisplayOnlyDeflection: true
+值类型：boolean
+
+A-c-11：shieldDeflectionDisplayRate（护盾消失速度）
+描述：默认值为4。数值越大消失越快。
+正确例子：shieldDeflectionDisplayRate: 3
+值类型：float
+
+A-c-12：showOnMinimap（显示在小地图上）
+描述：默认为true。如果为false，则在小地图上不显示此单位。
+正确例子：showOnMinimap: false
+值类型：boolean
+
+A-c-13：showOnMinimapToEnemies（显示于敌人小地图）
+描述：是否在敌人小地图上显示。目前不支持逻辑。
+正确例子：showOnMinimapToEnemies:false
+值类型：boolean
+
+A-c-14：showActionsWithMixedSelectionIfOtherUnitsHaveTag（混合所选单位所显示的行为(标签)）
+描述：如果选择的单位都包含此处使用的标签，则合并“行为(action)”。比如您的步单位通过部署转化成另一个单位，在混合时可以当作同一个单位处理，不再是默认的谁都无法执行操作。例子如红警的盟军大单位在混合选中后依旧可执行部署或解除。
+正确例子：showActionsWithMixedSelectionIfOtherUnitsHaveTag:tag_联系
+值类型：tags
+
+A-d：仅构建代码
+
+A-d-1：isBuilding（是建筑）
+描述：定义单位是否为建筑物。
+正确例子：isBuilding: true
+值类型：boolean
+
+A-d-2：footprint（建筑碰撞范围）
+描述：填四个数值(左，上，右，下)，单位是格子，建筑默认占一格，向左和向上需要填负数，填整数在选择时有偏移。；四个数值可以完全颠倒，这样不会阻碍单位移动。；决定建筑单位碰撞体积，此区域内单位不能通过，如果在单位运动途中单位则会绕过。单位实际可选择面积使用的是radius。
+正确例子：（1x1）footprint: 0,0,0,0；（2X2）footprint: 0,0,1,1；（3X3）footprint: -1,-1,1,1
+值类型：integers
+
+A-d-3：constructionFootprint（建筑覆盖范围）
+描述：基础规则同上，这个区域内不能建造建筑，但是单位可以通过。一般需要设定比上一个面积大。好处是即使建造的密密麻麻，单位也有路可走
+正确例子：constructionFootprint: -1,-1,1,3
+值类型：integers
+
+A-d-4：displayFootprint（建筑选择UI）
+描述：基础规则同上，用于选择单位时UI显示。不设定则默认为建筑覆盖区域。
+正确例子：displayFootprint: 0,0,1,1
+值类型：integers
+
+A-d-5：buildingSelectionOffset（建筑UI调整）
+描述：默认值为0。以像素为单位对选框额外设定。
+正确例子：buildingSelectionOffset: 4
+值类型：integer
+
+A-d-6：buildingToFootprintOffsetX（建筑X轴偏移）
+描述：设置X轴位置偏移，默认10.若设置非对称的建筑，单位会根据覆盖范围会挤在角上，这时如果要准确显示就需要额外偏移。与直接使用图像偏移的区别:；由于铁锈判断选中单位是根据单位体积(radius),因此图像偏移实际上单位的位置不变，会容易造成点击时的误差。而当前代码实际上是移动单位，则不会造成这个问题。
+正确例子：buildingToFootprintOffsetX: 4
+值类型：float
+
+A-d-7：buildingToFootprintOffsetY（建筑Y轴偏移）
+描述：设置Y轴位置偏移，默认10.其它参上条
+正确例子：buildingToFootprintOffsetY: 6
+值类型：float
+
+A-d-8：placeOnlyOnResPool（建筑只能建造在资源池上）
+描述：通常用于提取器，会强制在资源池中进行建筑物构造。可以用于在自定义战役中限制某单位只能在某地建造。
+正确例子：placeOnlyOnResPool: true
+值类型：boolean
+
+A-d-9：selfBuildRate（自动建造速度）
+描述：此单位自动构造所需要的时间，目前用于虫族。计算方式为：此处所填时间=1÷(60x您需要的秒)。
+正确例子：selfBuildRate: 0.0008
+值类型：float
+
+A-d-10：ignoreInUnitCapCalculation（不计入单位数量统计）
+描述：铁锈中有单位数量上限设定，填true时不计入统计，多用于辅助单位，建筑物的默认值为true。
+正确例子：ignoreInUnitCapCalculation:true
+值类型：boolean
+
+A-e：杂项代码
+
+A-e-1：copyFrom（复制数据自）
+描述：加载其它文件的单位数据作为该单位的默认值，支持多个文件。无后缀名限制，可不写dont_load，用于模块化。
+约束：文件路径中不允许包含 ..（不能回退到上级目录）
+正确例子：copyFrom: ROOT:defaultTanks.template, tankT1.ini
+错误例子：copyFrom:../../../a.ini
+值类型：file(s)
+
+A-e-2：dont_load（禁止加载）
+描述：不加载此单位，缺失数据时不会出错。与copyFrom一起使用时很有用。
+正确例子：dont_load: true
+值类型：boolean
+
+A-e-3：overrideAndReplace（覆盖单位）
+描述：用此单位覆盖另一个单位，地图上所有单位也将被替换，可以用来替换dex内无法修改的单位。
+正确例子：overrideAndReplace: builder, combatEngineer
+值类型：string(s)
+
+A-e-4：overrideResourceLoadPath（覆盖资源加载路径）
+描述：覆盖掉该单位的资源加载路径
+正确例子：overrideResourceLoadPath:false
+值类型：boolean
+
+A-e-5：logIfCreditResourceUsed（记录是否使用资源）
+描述：记录该单位是否使用了资源
+正确例子：logIfCreditResourceUsed:false
+值类型：boolean
+
+A-e-6：onNewMapSpawn（地图位置产生指定单位）
+描述：在地图上添加此单位。可以用于覆盖铁锈默认的资源逻辑。参数：；emptyResourcePools_asNeutral 产生位置于空资源池，并且为中立所属；emptyOrOccupiedResourcePools_asNeutral 空的或者已经占用的资源池，并且为中立所属；mapCenter_asNeutral 地图中心，且为中立所属；mapCenter_eachActiveTeam 地图中心，且给与每个玩家；spawnPoint_eachActiveTeam 玩家初始位置，给与每个玩家
+正确例子：[core]；name:钻矿机；onNewMapSpawn:emptyResourcePools_asNeutral
+值类型：string
+
+A-e-7：globalScale（全局缩放）
+描述：废弃代码，不要用。将一个单位按比例放大，但不放大攻击力。默认值为1。不建议更改。
+正确例子：globalScale: 2
+值类型：float
+
+A-e-8：isLocked（锁定）
+描述：禁止建造该单位。可以与overrideAndReplace一起使用，以限制玩家可以建造的单位。
+正确例子：isLocked: true
+值类型：boolean
+
+A-e-9：isLockedIfGameModeNoNuke（禁核模式锁定）
+描述：如果在游戏开始前选择了禁用核武器，禁止建造此单位。
+正确例子：isLockedIfGameModeNoNuke: true
+值类型：boolean
+
+A-e-10：experimental（实验单位标志）
+描述：标记单位为实验单位。影响缩小图标和游戏结束统计。
+正确例子：experimental: true
+值类型：boolean
+
+A-e-11：stayNeutral（保持中立）
+描述：设置为true时，单位处于中立队伍情况下，禁止靠近时更改为玩家所属。仍然有其它方式获得。
+正确例子：stayNeutral: false
+值类型：boolean
+
+A-e-12：createNeutral（创建时中立）
+描述：设置为true时，产生该单位总是自动转变为中立队伍。创建时中立，但不妨碍玩家捕获。
+正确例子：createNeutral: true
+值类型：boolean
+
+A-e-13：createOnNeutralTeam（创建时中立（旧写法））
+描述：兼容旧写法。效果与createNeutral相同，读取到该键时会直接打开createNeutral。建议优先使用createNeutral。
+正确例子：createOnNeutralTeam: true
+值类型：boolean
+
+A-e-14：createOnAggressiveTeam（创建为敌对中立）
+描述：设置为true时，此中立单位对所有玩家有敌意。
+正确例子：createOnAggressiveTeam: true
+值类型：boolean
+
+A-e-15：tags（标签）
+描述：标签，用于对单位进行分类，用于实现各种各样的特殊作。比如单位数量限制，伤害修正，增益损益，触发条件等等
+正确例子：tags: tank, smallTank, piercingDamage
+值类型：string(s)
+
+A-e-16：defineUnitMemory（定义单位内存）
+描述：为每个单位创建唯一的自定义存储变量。允许的类型：boolean/bool、float/number、unit、string/text。；格式：defineUnitMemory:类型 变量名称。；示例格式：defineUnitMemory: boolean nukeActive, boolean laserReady, float experience, unit nextTarget, unit homeBase, string customText。
+约束：内存名称不能是保留字：game,parent,self,this,boolean,bool,unit,void,null,number,float；内存名称不能包含字符 . ' = ( ) " ? | \ / [ ] : ;
+正确例子：defineUnitMemory:unit attackunit
+错误例子：defineUnitMemory:bool bool,boolean boolean,b?a string
+值类型：memories
+
+A-e-17：@memory（@定义内存）
+描述：定义单个内存，但可以打多行此代码，与上方代码相反
+约束：内存名称不能是保留字：game,parent,self,this,boolean,bool,unit,void,null,number,float；内存名称不能包含字符 . ' = ( ) " ? | \ / [ ] : ;
+正确例子：@memory datas:unit[]
+错误例子：@memory bool:bool
+值类型：memory
+
+A-e-18：updateUnitMemory（更新单位内存）
+描述：(类似[action]setUnitMemory但是性能更好)works like [action]setUnitMemory but with better performance and easier timing than triggering an action
+正确例子：updateUnitMemory:hp=self.hp/5
+值类型：memories
+
+A-e-19：updateUnitMemoryRate（更新单位内存频率）
+描述：(默认1s,填写0则为每帧)How often to call updateUnitMemory, defaults to 1s. At zero would trigger every frame.
+正确例子：updateUnitMemoryRate:0
+值类型：time
+
+A-e-20：fogOfWarSightRange（视野）
+描述：设置单位视野，在战争迷雾中可以看到的瓷砖数量。默认为15。
+正确例子：fogOfWarSightRange: 18
+值类型：integer
+
+A-e-21：fogOfWarSightRangeWhileNotBuilt（未完成时视野）
+描述：填数值，当建筑或单位没有建造完成时，它的视野范围
+正确例子：fogOfWarSightRangeWhileNotBuilt:3
+值类型：integer
+
+A-e-22：softCollisionOnAll（碰撞体积软化）
+描述：与其他单位碰撞时产生柔和的碰撞效果，填负数会导致单位相互吸引。
+正确例子：softCollisionOnAll: 3
+值类型：integer
+
+A-e-23：disableAllUnitCollisions（禁用碰撞）
+描述：如果为true，则该单位无视与其它单位碰撞。无碰撞体积单位可以用于固定位置制造效果，或是用于一些不影响单位通行的场景。
+正确例子：disableAllUnitCollisions: true
+值类型：boolean
+
+A-e-24：availableInDemo（在演示版中可用）
+描述：是否能在演示中使用
+正确例子：availableInDemo:true
+值类型：boolean
+
+A-e-25：isUnrepairableUnit（禁止被修复）
+描述：如果为true，则任何单位都无法修复此单位。但负伤害仍然可以维修。
+正确例子：isUnrepairableUnit: true
+值类型：boolean
+
+A-e-26：isUnselectable（禁止选择）
+描述：如果为true，则无法选择单位。 （包括AI）可用于效果单位，禁止被玩家选择。
+正确例子：isUnselectable: true
+值类型：boolean
+
+A-e-27：isUnselectableAsTarget（禁止选择和作为目标）
+描述：默认效果为isUnselectable。可以用来创造不能被选择但是可以被攻击，回收的单位
+正确例子：isUnselectableAsTarget:true
+值类型：boolean
+
+A-e-28：isPickableStartingUnit（为可选初始单位）
+描述：如果为true，则将单位添加到游戏高级设置菜单中，用于可选初始单位菜单。
+正确例子：isPickableStartingUnit:true
+值类型：boolean
+
+A-e-29：startFallingWhenStartingUnit（为可选单位开局后从天而降）
+描述：如果为true，则游戏开始时，此单位会从从天而降。
+正确例子：startFallingWhenStartingUnit: true
+值类型：boolean
+
+A-e-30：soundOnAttackOrder（攻击指令音效）
+描述：填音效名称列表。用,隔开。每次下达攻击指令时只播放其中一个。仅支持.ogg和.wav格式，注意如果您mod用于pc端，则不要直接修改后缀名，要转换格式。
+正确例子：soundOnAttackOrder: tankAttackOrder1.ogg:0.6, tankAttackOrder2.ogg
+值类型：file(s)
+
+A-e-31：soundOnMoveOrder（移动指令音效）
+描述：填声音名称列表。用,隔开。每次下达移动指令时只播放其中一个。仅支持.ogg和.wav格式，注意不要直接修改后缀名，要转换格式。
+正确例子：soundOnMoveOrder: tankMoveOrder1.ogg, tankMoveOrder2.ogg
+值类型：file(s)
+
+A-e-32：soundOnNewSelection（选择指令音效）
+描述：填声音名称列表。用,隔开。每次下达选择指令时只播放其中一个。仅支持.ogg和.wav格式，注意不要直接修改后缀名，要转换格式。
+正确例子：soundOnNewSelection: tankSelection1.ogg, tankSelection2.ogg
+值类型：file(s)
+
+A-e-33：canNotBeDirectlyAttacked（禁止直接攻击）
+描述：无敌，如果为true，任何单位都不能直接瞄准此单位，也不会受到范围武器伤害。则还将在胜利/失败检查中跳过检查。；注：如果初始单位有这个属性且可能会导致游戏开局就秒输时，Mod作者会看到警告消息
+正确例子：canNotBeDirectlyAttacked: true
+值类型：boolean
+
+A-e-34：canNotBeDamaged（禁止受到伤害）
+描述：无敌，可被敌方攻击，但不造成实质伤害。如果canNotBeDirectlyAttacked为true,此语句为false,则不可被直接攻击但受到范围伤害。
+正确例子：canNotBeDamaged:true
+值类型：boolean
+
+A-e-35：canNotBeGivenOrdersByPlayer（禁止接受指令）
+描述：如果为true，则单位不会接受玩家或AI的命令。可以选中查看信息。
+正确例子：canNotBeGivenOrdersByPlayer: true
+值类型：boolean
+
+A-e-36：canOnlyBeAttackedByUnitsWithTags（仅许带此标签单位攻击）
+描述：填标签，只有带有这些标签的单位才能直接定位到该单位。
+正确例子：canOnlyBeAttackedByUnitsWithTags: piercingTank, powerfulTank
+值类型：strings(s)
+
+A-e-37：allowCaptureWhenNeutralByAI（允许中立时被AI俘虏）
+描述：(推测,以前人机不能捕获中立单位)
+正确例子：allowCaptureWhenNeutralByAI:true
+值类型：boolean
+
+A-f：运输代码
+
+A-f-1：transportSlotsNeeded（运输占用位置）
+描述：默认值为1。此单位在运输载具中占据的格子数。
+正确例子：transportSlotsNeeded: 2
+值类型：integer
+
+A-f-2：maxTransportingUnits（运输槽位数量）
+描述：该单位载员格子数量。
+正确例子：maxTransportingUnits: 5
+值类型：integer
+
+A-f-3：transportUnitsRequireTag（被运输单位需要标签）
+描述：仅允许运输具有这些标签之一的单位。可以用于运输类型分类，如人运物资，步单位车运人，气垫船运车辆。或是子机限制，如航母飞机只能降落到航母。
+正确例子：transportUnitsRequireTag: smallTank, soldier
+值类型：string(s)
+
+A-f-4：transportUnitsRequireMovementType（被运输单位类型限制）
+描述：仅允许运输具有这些移动类型之一的单位。默认陆地。比如可以设定某单位可以运输空军以实现停机坪，只运输海军等。
+正确例子：transportUnitsRequireMovementType: AIR, WATER
+值类型：enum(s)
+
+A-f-5：transportUnitsBlockAirAndWaterUnits（禁止运输空军和海军）
+描述：禁止运输空军和海军，默认为true。如果为true，则此单位只能运输LAND单位。
+正确例子：transportUnitsBlockAirAndWaterUnits: false
+值类型：boolean
+
+A-f-6：transportUnitsKeepBuiltUnits（单位建造完成时保留在载具内）
+描述：使建造的单位留在运输者中，而不是造完直接从载具中出来。
+正确例子：transportUnitsKeepBuiltUnits: true
+值类型：Logicbooleanean
+
+A-f-7：transportUnitsCanUnloadUnits（载具可以卸载单位）
+描述：载具卸载单位需要满足条件，默认为“ if not self.isOverLiquid() and not self.isMoving()”(不在液体上且没有移动)
+正确例子：transportUnitsCanUnloadUnits: false
+值类型：Logicbooleanean
+
+A-f-8：transportUnitsAddUnloadOption（载具显示卸载按钮）
+描述：是否显示卸载按钮
+正确例子：transportUnitsAddUnloadOption: false
+值类型：boolean
+
+A-f-9：transportUnitsUnloadDelayBetweenEachUnit（载具卸载时间间隔）
+描述：卸载单位之间的延迟时间。
+正确例子：transportUnitsUnloadDelayBetweenEachUnit: 12
+值类型：time
+
+A-f-10：transportUnitsKillOnDeath（载具内单位和载具一同死亡）
+描述：默认为true。如果载具死亡，则其中单位也死亡。
+正确例子：transportUnitsKillOnDeath: if self.isOverLiquid()
+值类型：Logicbooleanean
+
+A-f-11：transportUnitsHealBy（载具治疗内部单位速度）
+描述：填数值，以帧为单位。自动治疗载具内部单位。
+正确例子：transportUnitsHealBy: 0.1
+值类型：float
+
+A-f-12：transportUnitsBlockOtherTransports（载具禁止装载其它载具）
+描述：默认值为true，如果为false，则此载具可以装载其它载具。比如步单位装物资，载具装步单位，运输船装载具。
+正确例子：transportUnitsBlockOtherTransports: false
+值类型：boolean
+
+A-f-13：whileNeutralTransportAnyTeam（中立时可装载任意所属单位）
+描述：如果是中立的，则这个部队可以装载任何队伍的部队。可用于占领中立单位，比如坦克需要驾驶员，步单位建筑平民建筑。
+正确例子：whileNeutralTransportAnyTeam: true
+值类型：boolean
+
+A-f-14：whileNeutralConvertToTransportedTeam（中立时转换为载员队伍）
+描述：中立时将其转换为载员队伍。与whileNeutralTransportAnyTeam一起使用，用于占领中立单位。
+正确例子：whileNeutralConvertToTransportedTeam: true
+值类型：boolean
+
+A-f-15：convertToNeutralIfNotTransporting（卸载所有单位时恢复为中立）
+描述：卸载单位时将其恢复为中立队伍。与whileNeutralTransportAnyTeam一起使用。
+正确例子：convertToNeutralIfNotTransporting: true
+值类型：boolean
+
+A-f-16：transportUnitsOnTeamChangeKeepCurrentTeam（转换所属时保留内部单位所属）
+描述：如果为true，则单位转换阵营时仍然将运输的单位保留在其原始队伍中。
+正确例子：transportUnitsOnTeamChangeKeepCurrentTeam: true
+值类型：boolean
+
+A-f-17：transportUnitsEachUnitAlwaysUsesSingleSlot（载员只占用一个槽位）
+描述：所有载员无论体积只占用一个运输槽。但体积大于载员数时仍然不能进入。
+正确例子：transportUnitsEachUnitAlwaysUsesSingleSlot:true
+值类型：boolean
+
+A-f-18：transportUnitsKeepWaypoints（载员保持路径点）
+描述：目前无效
+正确例子：transportUnitsKeepWaypoints:true
+值类型：LogicBoolean
+
+A-g：资源节点代码
+
+A-g-1：resourceRate（回收速率）
+描述：回收速度。每帧回收血量。与canReclaimResources一起使用。允许其他队伍回收该单位。通常与中立队伍配合使用。使用价格来设置获取哪些资源。
+正确例子：resourceRate:1
+值类型：float
+
+A-g-2：similarResourcesHaveTag（像用于此标签的单位）
+描述：有这些标签时，资源采集单位将视为同一种资源
+正确例子：similarResourcesHaveTag: goldResource
+值类型：string(s)
+
+A-g-3：resourceMaxConcurrentReclaimingThis（可同时被此数目单位回收）
+描述：默认为无限制。限制有多少单位可以同时回收此资源。
+正确例子：resourceMaxConcurrentReclaimingThis: 3
+值类型：integer
+
+A-g-4：reclaimPrice（回收价格）
+描述：自定义资源，类似价格。对于自定义资源很有用。
+正确例子：reclaimPrice: gold=1000
+值类型：price(s)
+
+A-h：资源收集器代码
+
+A-h-1：canReclaimResources（可以回收资源）
+描述：如果为true，则此单位可以收集资源，这对于resourceRate很有用。
+正确例子：canReclaimResources: true
+值类型：boolean
+
+A-h-2：canReclaimResourcesNextSearchRange（搜寻资源范围）
+描述：当一处资源采集完后，搜寻更多资源的范围。
+正确例子：canReclaimResourcesNextSearchRange: 100
+值类型：integer
+
+A-h-3：canReclaimResourcesOnlyWithTags（仅允许回收特定标签资源）
+描述：仅允许回收有此标签的单位。
+正确例子：canReclaimResourcesOnlyWithTags: foodResource, goldResource
+值类型：string(s)
+
+A-h-4：resourceReclaimMultiplier（建造单位回收资源的乘数）
+描述：默认为1
+正确例子：resourceReclaimMultiplier:1
+值类型：float
+
+A-h-5：nanoUnbuildSpeed（建造单位回收未完成单位速度）
+描述：(俗称"蓝影"，默认为1)
+正确例子：nanoUnbuildSpeed:1
+值类型：float
+
+A-i：建筑和工厂代码
+
+A-i-1：canRepairBuildings（可以修建筑）
+描述：如果为true，该单位可以修复建筑。 （isBuilder：true是必需的）
+正确例子：canRepairBuildings: true
+值类型：boolean
+
+A-i-2：canRepairUnits（可以修单位）
+描述：如果为true，此单位可以修复单位。 （isBuilder：true是必需的）
+正确例子：canRepairUnits: true
+值类型：boolean
+
+A-i-3：autoRepair（可以自动修）
+描述：自动维修附近单位，范围为nanoRange。 （isBuilder：true是必需的）
+正确例子：autoRepair: true
+值类型：boolean
+
+A-i-4：canReclaimUnitsOnlyWithTags（仅允许回收特定标签单位）
+描述：仅允许此单位回收具有特定标签单位。
+正确例子：canReclaimUnitsOnlyWithTags:shibaInu
+值类型：tags
+
+A-i-5：canRepairUnitsOnlyWithTags（仅允许维修特定标签单位）
+描述：仅允许此单位维修具有特定标签单位。
+正确例子：canRepairUnitsOnlyWithTags:cat
+值类型：tags
+
+A-i-6：nanoRange（维修或建造范围）
+描述：默认值为85。定义单位的构建/修复/回收范围。
+正确例子：nanoRange: 110
+值类型：integer
+
+A-i-7：nanoRepairSpeed（维修速度）
+描述：默认值为0.2。定义单位修复速度。
+正确例子：nanoRepairSpeed: 0.01
+值类型：float
+
+A-i-8：nanoBuildSpeed（建造速度）
+描述：默认值为1。定义单位建造速度。 （可能与目标的buildSpeed相乘）
+正确例子：nanoBuildSpeed: 0.9
+值类型：float
+
+A-i-9：nanoReclaimSpeed（回收速度）
+描述：默认为nanoRepairSpeed*5.1)以符合旧版本的行为
+正确例子：nanoReclaimSpeed:5.1
+值类型：float
+
+A-i-10：nanoRangeForRepairIsMelee（维修范围按近战逻辑）
+描述：定义此单位维修时是否为近战算法，默认计算是从自身中心到目标中心，如果单位过大运动又受到阻碍，则虽然看起来很近，然而实际太远无法建造。；近战类算法则是算上其半径，由中心计算改为从边缘计算。
+正确例子：nanoRangeForRepairIsMelee: true
+值类型：boolean
+
+A-i-11：nanoRangeForReclaimIsMelee（回收范围按近战逻辑）
+描述：与上条类似，本条定义其回收范围是否为近战算法。
+正确例子：nanoRangeForReclaimIsMelee: true
+值类型：boolean
+
+A-i-12：nanoRangeForRepair（维修距离）
+描述：此单位维修距离。
+正确例子：nanoRangeForRepair: 60
+值类型：integer
+
+A-i-13：nanoRangeForReclaim（回收距离）
+描述：此单位回收距离。
+正确例子：nanoRangeForReclaim: 60
+值类型：integer
+
+A-i-14：nanoFactorySpeed（工厂速度乘数）
+描述：默认值为1。如果此单位是工厂，则乘以创建单位的buildSpeed值。用于加速或者减速建造。
+正确例子：nanoFactorySpeed: 1.2
+值类型：float
+
+A-i-15：extraBuildRangeWhenBuildingThis（额外建造距离）
+描述：此单位额外的建造距离，可以使建造者在更远的地方建造它，多用于水上建筑。
+正确例子：extraBuildRangeWhenBuildingThis: 90
+值类型：float
+
+A-i-16：builtFrom_#_name（从此单位建造）
+描述：除非您向原版工厂添加单位，否则不建议使用。将该单位添加到目标建筑物中。
+正确例子：builtFrom_1_name: landFactory, airFactory
+值类型：string(s)
+
+A-i-17：builtFrom_#_pos（从此单位建造排序）
+描述：在列表中的排序，越小越靠前。
+正确例子：builtFrom_1_pos: 0.1
+值类型：float
+
+A-i-18：builtFrom_#_forceNano（从此单位像建筑一样建造）
+描述：如果为true，则像构建建筑一样造此单位。 （即使是一个单位）
+正确例子：builtFrom_1_forceNano: true
+值类型：boolean
+
+A-i-19：builtFrom_#_isLocked（从此单位建造条件）
+描述：如果为true，则无法在目标中构建此单位。 （逻辑布尔值，设置建造条件）
+正确例子：builtFrom_1_isLocked: if self.hp(lessThan=100)
+值类型：Logicbooleanean
+
+A-i-20：builtFrom_#_isLockedMessage（从此单位建造锁定信息）
+描述：无法建造时显示的信息。
+正确例子：builtFrom_1_isLockedMessage: -Needs more population
+值类型：string
+
+A-i-21：exit_x（离开x轴）
+描述：从载具卸载或者工厂生产完成时，单位出现的位置，默认为0
+正确例子：exit_x: 0
+值类型：float
+
+A-i-22：exit_y（离开y轴）
+描述：从载具卸载或者工厂生产完成时，单位出现的位置，默认为9，正数向下。
+正确例子：exit_y: 9
+值类型：float
+
+A-i-23：exit_dirOffset（离开旋转角度）
+描述：单位默认为180(朝下)，建筑物默认为0(朝右)。定义已创建或卸载单位的退出方向。
+正确例子：exit_dirOffset: 140
+值类型：float
+
+A-i-24：exit_heightOffset（离开高度）
+描述：默认值为0。定义创建或卸载的单位出现的高度。
+正确例子：exit_heightOffset: 16
+值类型：float
+
+A-i-25：exit_moveAwayAmount（离开距离）
+描述：默认值为70。定义创建或卸载的单位与该单位的距离。
+正确例子：exit_moveAwayAmount: 10
+值类型：float
+
+A-i-26：exitHeightIgnoreParent（离开高度忽略父单位）
+描述：离开时的高度不考虑父高度;用于与父单位一起建造时分离附件
+正确例子：exitHeightIgnoreParent:true
+值类型：boolean
+
+A-j：死亡代码
+
+A-j-1：dieOnConstruct（构建时死亡）
+描述：如果为true，则创建建筑时删除自身。（目标建筑物/单位需要selfBuildRate以自动建造完成）
+正确例子：dieOnConstruct: true
+值类型：boolean
+
+A-j-2：dieOnZeroEnergy（无能量时死亡）
+描述：如果能量值为零，该单位死亡。
+正确例子：dieOnZeroEnergy: true
+值类型：boolean
+
+A-j-3：numBitsOnDeath（死亡产生碎片）
+描述：定义该单位死亡时散落的碎片的数量。
+正确例子：numBitsOnDeath: 20
+值类型：integer
+
+A-j-4：fireOnDeath（死亡发射武器）
+描述：填整数，应该是炮塔的ID
+正确例子：fireOnDeath:1
+值类型：integer
+
+A-j-5：nukeOnDeath（死亡核爆）
+描述：不推荐使用。建议使用死亡武器代替，其拥有更丰富的设定选项。如果为true，单位死亡时会生成一个内置的核抛射体爆炸效果。
+正确例子：nukeOnDeath: true
+值类型：boolean
+
+A-j-6：nukeOnDeathRange（死亡核爆范围）
+描述：不推荐使用。定义使用nukeOnDeath时的核抛射体效果范围。
+正确例子：nukeOnDeathRange: 140
+值类型：float
+
+A-j-7：nukeOnDeathDamage（死亡核爆伤害）
+描述：不推荐使用。定义使用nukeOnDeath时的核武器效果区域伤害。
+正确例子：nukeOnDeathDamage: 2000
+值类型：float
+
+A-j-8：nukeOnDeathDisableWhenNoNuke（死亡核爆条件）
+描述：不推荐使用。默认为false。如果为true，则禁用核武器时，该单位死亡时不会产生核爆炸。
+正确例子：nukeOnDeathDisableWhenNoNuke: true
+值类型：boolean
+
+A-j-9：fireTurretXAtSelfOnDeath（死亡武器）
+描述：死亡武器。单位死后，使用指定炮塔攻击自身所在位置。
+正确例子：fireTurretXAtSelfOnDeath: turret_1
+值类型：turret code name
+
+A-j-10：explodeOnDeath（死亡爆炸）
+描述：默认为true。如果为false，则禁用单位死亡时的内置爆炸效果。
+正确例子：explodeOnDeath: false
+值类型：boolean
+
+A-j-11：explodeOnDeathGroundCollision（死亡撞击地面爆炸）
+描述：默认为true。如果为false，则禁用接触地面时内置爆炸效果。
+正确例子：explodeOnDeathGroundCollision: false
+值类型：boolean
+
+A-j-12：effectOnDeath（死亡效果）
+描述：单位死亡时产生内置或自定义效果。
+正确例子：effectOnDeath: shockwave, CUSTOM:pieces*3, CUSTOM:deathSound
+值类型：effect(s) code name
+
+A-j-13：effectOnDeathGroundCollision（死亡撞击地面效果）
+描述：类似于effectOnDeath，但当单位接触地面时。对飞行单位有用。
+正确例子：effectOnDeathGroundCollision: CUSTOM:bigExplosion
+值类型：effect(s) code name
+
+A-j-14：explodeOnDeathGroundCollosion（死亡撞击地面爆炸（旧拼写别名））
+描述：旧拼写兼容键（Collosion）。与explodeOnDeathGroundCollision是同一字段，不是另一套独立逻辑。建议使用正确拼写explodeOnDeathGroundCollision。
+正确例子：explodeOnDeathGroundCollosion: true
+值类型：boolean
+
+A-j-15：effectOnDeathGroundCollosion（死亡撞击地面效果（旧拼写别名））
+描述：旧拼写兼容键（Collosion）。与effectOnDeathGroundCollision是同一字段，不是“未撞地”的第二种效果。建议使用正确拼写effectOnDeathGroundCollision。
+正确例子：effectOnDeathGroundCollosion: CUSTOM:bigExplosion
+值类型：effect(s) code name
+
+A-j-16：unitsSpawnedOnDeath（死亡产生单位）
+描述：死亡时产生这些单位。逗号分隔的单位标识符。
+正确例子：unitsSpawnedOnDeath: tank*5, hoverTank
+值类型：string(s)
+
+A-j-17：unitsSpawnedOnDeath_setToTeamOfLastAttacker（死亡产生单位所属）
+描述：如果为true，死亡时产生的单位将更改归属为最后一个攻击者的队伍。
+正确例子：unitsSpawnedOnDeath_setToTeamOfLastAttacker: true
+值类型：boolean
+
+A-j-18：hideScorchMark（死亡痕迹）
+描述：如果为true，则禁止单位死亡时留下焦痕。
+正确例子：hideScorchMark: true
+值类型：boolean
+
+A-j-19：soundOnDeath（死亡音效）
+描述：为该单位设置自定义死亡声音。
+正确例子：soundOnDeath: tankExplosion1.ogg, tankExplosion2.ogg
+值类型：file(s)
+
+A-j-20：explodeTypeOnDeath（死亡时爆炸类型）
+描述：添加内置死亡效果关键字。；可选项：verysmall、small、normal、large、largeUnit、building、buildingNoShockwaveOrSmoke、verylargeBuilding。；对应中文：非常小、很小、正常、大、大单位、建筑物、无冲击波和烟雾的建筑物、非常大建筑。
+正确例子：explodeTypeOnDeath:small
+值类型：enum
+
+A-j-21：effectOnDeathIfUnbuilt（没建造完成时死亡效果）
+描述：如果这个单位没建造完成就被毁了，则播放此效果
+正确例子：effectOnDeathIfUnbuilt: CUSTOM:implode
+值类型：effect(s) code name
+
+A-j-22：disableDeathOnZeroHp（禁用零血死亡）
+描述：如果为true，允许单位在0血量的情况下仍然存活，单位不会自然死亡。对自定义“死亡”动作很有用
+正确例子：disableDeathOnZeroHp:true
+值类型：boolean
+
+A-k：动作代码
+
+A-k-1：autoTriggerCooldownTime（自动触发间隔）
+描述：设置自动触发动作间隔。默认为1s。警告：对于许多设备，将此值设置得太低可能会影响性能，具体取决于操作效果。
+正确例子：autoTriggerCooldownTime:0.1s
+值类型：time
+
+A-k-2：autoTriggerCooldownTime_allowDangerousHighCPU（允许超高频触发）
+描述：自动触发冷却时间，允许高CPU占用，也就是可以使用非常高频的触发，但不建议这么做。
+正确例子：autoTriggerCooldownTime_allowDangerousHighCPU:true
+值类型：boolean
+
+A-k-3：autoTriggerCheckWhileNotBuilt（在未建造完成时依然自动触发）
+描述：- 默认为 false - 当 true 时，即使单位未完成建造，所有自动触发器仍在运行
+正确例子：autoTriggerCheckWhileNotBuilt:true
+值类型：boolean
+
+A-k-4：autoTriggerCheckRate（自动触发检查率）
+描述：选项:everyFrame(默认)，every4Frames, every8Frames。；注意:所有触发器无论检查率都是在第一次创建和自动触发冷却之后检查的。；注:使用模板添加[core]autoTriggerCheckRate:every8Frames到所有单位。可以使使用了复杂autoTriggers的mod有巨大的性能提升。
+正确例子：autoTriggerCheckRate:everyFrame
+值类型：enum
+
+A-l：不建议使用的代码
+
+A-l-1：action_#_[actionKey]（行动_#_[行动节代码]）
+描述：不建议使用，请改用[action_x]节
+正确例子：action_1_setUnitMemory:xxx="xxx"
+值类型：special
+
+A-l-2：canBuild_#_[canBuildKey]（可建造_#_[可建造节代码]）
+描述：请改用canBuild部分。
+正确例子：canBuild_1_name: tank
+值类型：special
+
+B：可建造[canBuild_NAME]
+
+B-1：name（名字）
+描述：该单位可以创建的单位名列表。可以是建筑物或单位。
+正确例子：name: tank, hoverTank, heavyTank
+值类型：string(s)
+
+B-2：pos（排序）
+描述：此单位在用户界面中排序，越小越靠上。
+正确例子：pos: 0.1
+值类型：float
+
+B-3：tech（科技）
+描述：没啥用。科技等级。通常只会影响此单位界面中的颜色。默认为1，只能填1、2、3。
+正确例子：tech: 2
+值类型：integer
+
+B-4：forceNano（建造方式）
+描述：如果为true，则将目标当作是建筑物建造。 （即使是一个单位）
+正确例子：forceNano: true
+值类型：boolean
+
+B-5：isVisible（可见条件）
+描述：如果满足条件，则从界面中显示此单位。比如用于科技树。
+正确例子：isVisible: if not self.energy(greaterThan=100)
+值类型：Logicbooleanean
+
+B-6：isLocked（锁定）
+描述：如果满足条件，则从界面中锁定此单位。比如用于科技树，或是限造单位。
+正确例子：isLocked: if self.hp(lessThan=100)
+值类型：Logicbooleanean
+
+B-7：isLockedMessage（锁定原因描述）
+描述：告知玩家单位为何被锁定。
+正确例子：isLockedMessage: -Needs 2 Barracks
+值类型：string
+
+B-8：isLockedMessage_[Language]（锁定文本多语言）
+描述：设置锁定文本在不同语言下显示的内容。语言代码点击此处。
+正确例子：isLockedMessage_es: -Necesita 2 Cuarteles
+值类型：string
+
+B-9：isLockedAlt（更多锁定原因）
+描述：另一个被锁定原因。只是允许显示不同的消息。
+正确例子：isLockedAlt: if self.energy(greaterThan=90)
+值类型：Logicbooleanean
+
+B-10：isLockedAltMessage（锁定原因描述）
+描述：另一个被锁定原因描述。
+正确例子：isLockedAltMessage: -Needs less energy
+值类型：string
+
+B-11：isLockedAlt2（更多锁定原因2）
+描述：更多的锁定原因…
+正确例子：isLockedAlt2: if self.isMoving()
+值类型：Logicbooleanean
+
+B-12：isLockedAlt2Message（锁定文本2描述）
+描述：更多的锁定描述…
+正确例子：isLockedAlt2Message: -Needs to be quiet
+值类型：string
+
+B-13：addResources（增加资源）
+描述：在放置建筑物或生产单位时，将这些资源添加到自身中。
+正确例子：addResources: ammo=5, setFlag=1
+值类型：price(s)
+
+B-14：price（价格）
+描述：覆盖单位/建筑物的价格。 默认为单位内置的价格。；用处如建造一个建筑时候附送一个单位。此代码可用设定为两者价钱之和,矿场600,送矿车1400,而建造时花2000,送1400,卖600,可避免玩家生成钱。
+正确例子：price: credits=1000, ammo=5
+值类型：price(s)
+
+B-15：isGuiBlinking（界面闪烁）
+描述：如果为true，则在UI中生成闪烁效果。
+正确例子：isGuiBlinking: true
+值类型：Logicbooleanean
+
+B-16：extraLagHidingInUI（消除ui额外延迟）
+描述：用于联机，在UI中立即更新而不需要从服务器确认的等待时间。
+正确例子：extraLagHidingInUI:true
+值类型：boolean
+
+B-17：type（显示类型）
+描述：与行动节的displayType用法相同
+正确例子：type:action
+值类型：string
+
+C：图像[graphics]
+C-a：未分类、C-b：炮塔（也可以在每个炮塔上设置图像）、C-c：阴影、C-d：效果和动画、C-e：特殊键、C-f：不建议使用的代码
+
+C-a：未分类
+
+C-a-1：image（主体图像）
+描述：填图片名称，格式为png。
+正确例子：image:base.png
+值类型：file
+
+C-a-2：image_back（背景图像）
+描述：可选的在单位后面绘制图像，不随单位转动。可用于工厂底图，单位角标等。
+正确例子：image_back:back.png
+值类型：file
+
+C-a-3：image_back_always_use_full_image（图像背景总是使用完整的图像）
+描述：默认会裁剪或拉伸或平铺到和主体图像一致.
+正确例子：image_back_always_use_full_image:true
+值类型：boolean
+
+C-a-4：image_wreak（死亡图像）
+描述：可选的单位死亡时使用的图像。
+正确例子：image_wreak:wreak.png
+值类型：file
+
+C-a-5：image_shield（护盾图像）
+描述：自定义护盾所使用的图像。
+正确例子：image_shield:shibe.png
+值类型：file
+
+C-a-6：image_offsetX（图像X轴偏移）
+描述：图像在X轴偏移，用于不对称图像，比如您的单位有个吊臂，这样中心不在正中间。
+正确例子：image_offsetX:10
+值类型：integer
+
+C-a-7：image_offsetY（图像Y轴偏移）
+描述：图像在Y轴偏移,用于比较高的单位。
+正确例子：image_offsetY:-20
+值类型：integer
+
+C-a-8：image_offsetH（图像高度偏移）
+描述：图像在高度上的偏移
+正确例子：image_offsetH:1.2
+值类型：float
+
+C-a-9：isVisible（可见）
+描述：默认为true,如果为false将隐藏单位。
+正确例子：isVisible: if self.hasFlag(id=1)
+值类型：logicbooleanean
+
+C-a-10：isVisibleToEnemies（对敌人可见）
+描述：与showOnMinimapToEnemies,canOnlyBeAttackedByUnitsWithTags一起使用时，可以创建隐形系统。
+正确例子：isVisibleToEnemies:false
+值类型：boolean
+
+C-a-11：teamColorsUseHue（阵营色色相）
+描述：luke不建议使用。单位上的绿色像素转换为团队颜色。 若为true整个单位都带有团队色彩。 默认为false，挺难看的。
+正确例子：teamColorsUseHue:true
+值类型：boolean
+
+C-a-12：teamColoringMode（阵营色模式）
+描述：设置单位着色逻辑，默认是纯绿。有四个值disabled,hueShift,hueAdd,pureGreen。(禁用，色相偏移，色相添加，纯绿)
+正确例子：teamColoringMode:hueAdd
+值类型：enum
+
+C-a-13：scaleImagesTo（缩放图像到）
+描述：单位像素。调整图像大小以使其适合像素值。同时影响腿部和阴影图像。
+正确例子：scaleImagesTo:15
+值类型：float
+
+C-a-14：imageScale（图像缩放比例）
+描述：调整图像大小。默认值为1。也可以影响腿部和阴影图像。
+正确例子：imageScale:0.9
+值类型：float
+
+C-a-15：drawLayer（绘制图层）
+描述：陆上单位通常默认为ground或ground2。运输船为ground2。wreaks, underwater, bottom, ground, ground2, experimentals, air, top
+正确例子：drawLayer:ground
+值类型：enum
+
+C-a-16：whenBeingBuiltMakeTransparentTill（建造时透明度）
+描述：设为0则一开始便完全不透明，设为1则直到建造完成时才不透明。
+正确例子：whenBeingBuiltMakeTransparentTill:0.5
+值类型：float
+
+C-a-17：icon_zoomed_out（缩放图标）
+描述：缩放时显示的图标
+正确例子：icon_zoomed_out:tank_zoomed.png
+值类型：file
+
+C-a-18：icon_zoomed_out_neverShow（缩放图标永不显示）
+描述：缩放图标永不显示。
+正确例子：icon_zoomed_out_neverShow:false
+值类型：boolean
+
+C-a-19：icon_build（建造图标）
+描述：填文件名,指定图像作为单位在列表中显示的图像.
+正确例子：icon_build:icon_shiba.png
+值类型：file
+
+C-a-20：image_floatingPointSize（对奇数大小的图像进行一个像素的调整）
+描述：(填写0/1,无直观区别,有说法是把x-1来改变单位坐标系使其更方便使用)--Fixes off by 1 pixel sizing for odd sized images -
+正确例子：image_floatingPointSize:true
+值类型：boolean
+
+C-a-21：showSelectionIndicator（显示选择指示）
+描述：(单位的选择框)
+正确例子：showSelectionIndicator:false
+值类型：boolean
+
+C-b：炮塔（也可以在每个炮塔上设置图像）
+
+C-b-1：image_turret（炮塔图像）
+描述：所有炮塔的默认图像，也可以为每个炮塔设置专用图像。
+正确例子：image_turret:tank_turret.png
+值类型：file
+
+C-b-2：turretImageScale（炮塔图像缩放）
+描述：按比例缩放炮塔图像
+正确例子：turretImageScale:2
+值类型：float
+
+C-b-3：teamColorsOnTurret（炮塔使用队伍色）
+描述：默认为false。在转塔上也应用团队颜色。
+正确例子：teamColorsOnTurret:true
+值类型：boolean
+
+C-b-4：scaleTurretImagesTo（炮塔图像缩放）
+描述：单位像素。缩放炮塔图像至指定像素，只用填宽度
+正确例子：scaleTurretImagesTo:112.6
+值类型：float
+
+C-b-5：lock_body_rotation_with_main_turret（锁定主体旋转随主炮塔）
+描述：锁定主体图像旋转追随主炮塔
+正确例子：lock_body_rotation_with_main_turret:true
+值类型：boolean
+
+C-b-6：lock_leg_rotation_with_main_turret（锁定腿脚旋转随主炮塔）
+描述：锁定腿脚图像旋转追随主炮塔
+正确例子：lock_leg_rotation_with_main_turret:true
+值类型：boolean
+
+C-c：阴影
+
+C-c-1：image_shadow（阴影图像）
+描述：填 NONE、AUTO、AUTO_ANIMATED 或图像文件。；AUTO 表示根据单位主体图自动生成阴影图像。；AUTO_ANIMATED 表示根据动画当前帧自动生成阴影图像。
+正确例子：image_shadow:AUTO
+值类型：file/enum
+
+C-c-2：shadowOffsetX（阴影图像偏移X轴）
+描述：阴影x轴偏移值，正数往右
+正确例子：shadowOffsetX:1
+值类型：float
+
+C-c-3：shadowOffsetY（阴影图像偏移Y轴）
+描述：阴影y轴偏移值，正数往下
+正确例子：shadowOffsetY:2
+值类型：float
+
+C-c-4：image_shadow_frames（阴影图像指定）
+描述：true时阴影不随单位移动而改变方向。
+正确例子：image_shadow_frames:true
+值类型：boolean
+
+C-c-5：lock_shadow_rotation_with_main_turret（阴影锁定为主炮塔方向）
+描述：将身体图像阴影锁定到主炮塔的方向
+正确例子：lock_shadow_rotation_with_main_turret:true
+值类型：boolean
+
+C-d：效果和动画
+
+C-d-1：total_frames（图像帧数）
+描述：默认值为1。将图像分割为指定分数，用于动画。第一帧编号为0
+正确例子：total_frames:15
+值类型：integer
+
+C-d-2：default_frame（默认帧）
+描述：指定默认显示为第几帧,默认为0即第一帧
+正确例子：default_frame:1
+值类型：integer
+
+C-d-3：frame_width（图像宽度）
+描述：设置单帧宽度，自动计算并覆盖总帧数。
+正确例子：frame_width:35
+值类型：integer
+
+C-d-4：frame_height（图像高度）
+描述：默认为图像高度
+正确例子：frame_height:35
+值类型：integer
+
+C-d-5：splastEffect（水波效果）
+描述：在水上时创建水波效果。默认为false
+正确例子：splastEffect:true
+值类型：boolean
+
+C-d-6：dustEffect（灰尘效果）
+描述：在地面上产生灰尘效果。默认为false
+正确例子：dustEffect:true
+值类型：boolean
+
+C-d-7：splastEffectReverse（逆向水波效果）
+描述：填true时，在倒车时也能产生效果
+正确例子：splastEffectReverse:true
+值类型：boolean
+
+C-d-8：dustEffectReverse（逆向灰尘效果）
+描述：填true时，在倒车时也能产生效果
+正确例子：dustEffectReverse:true
+值类型：boolean
+
+C-d-9：movementEffect（运动效果）
+描述：自定义运动效果，可以是内置的或者自定义的。
+正确例子：movementEffect:smoke, CUSTOM:fastDust*2, CUSTOM:pop*5
+值类型：effect(s) code name
+
+C-d-10：movementEffectReverse（逆向运动效果）
+描述：自定义倒车效果。
+正确例子：movementEffectReverse:smoke
+值类型：effect(s) code name
+
+C-d-11：movementEffectRate（运动效果频率）
+描述：自定义效果产生频率，每隔多少帧一次。
+正确例子：movementEffectRate:8
+值类型：float
+
+C-d-12：movementEffectReverseFlipEffects（逆向时反转运动效果）
+描述：倒车时反转效果
+正确例子：movementEffectReverseFlipEffects:true
+值类型：boolean
+
+C-d-13：repairEffect（维修效果）
+描述：自定义维修效果，可以是任何东西。替换构建时的默认效果
+正确例子：repairEffect:smoke
+值类型：effect(s) code name
+
+C-d-14：repairEffectAtTarget（维修目标效果）
+描述：维修目标上产生的效果。
+正确例子：repairEffectAtTarget:smoke
+值类型：effect(s) code name
+
+C-d-15：repairEffectRate（维修效果频率）
+描述：维修效果每隔多少帧产生一次。
+正确例子：repairEffectRate:8
+值类型：float
+
+C-d-16：reclaimEffect（回收效果）
+描述：自定义回收效果，可以是任何东西。替换回收时的默认效果
+正确例子：reclaimEffect:smoke
+值类型：effect(s) code name
+
+C-d-17：reclaimEffectAtTarget（回收目标效果）
+描述：回收目标上产生的效果。
+正确例子：reclaimEffectAtTarget:smoke
+值类型：effect(s) code name
+
+C-d-18：reclaimEffectRate（回收效果频率）
+描述：回收效果每隔多少帧产生一次。
+正确例子：reclaimEffectRate:8
+值类型：float
+
+C-d-19：rotate_with_direction（随角度旋转）
+描述：默认为true。设置为false时将单位图像锁定为0度。通常与animation_direction_ *一起用作多向视图。
+正确例子：rotate_with_direction:false
+值类型：boolean
+
+C-d-20：animation_direction_useMainTurret（多向动画使用主炮塔）
+描述：多向动画的执行将以单位主炮塔的角度为基准
+正确例子：animation_direction_useMainTurret:true
+值类型：boolean
+
+C-d-21：animation_direction_units（多向动画度数）
+描述：每隔多少度切换一次素材,比如填45代表8个方向，90个代表4个方向的动画。与rotate_with_direction一起使用。
+正确例子：animation_direction_units:45
+值类型：float
+
+C-d-22：animation_direction_strideX（多向动画x向）
+描述：动画帧取值在X方向改变时偏移。一般填0
+正确例子：animation_direction_strideX:0
+值类型：integer
+
+C-d-23：animation_direction_strideY（多向动画y向）
+描述：动画帧在方向改变Y轴偏移偏移。与frame_height一起使用。一般填1
+正确例子：animation_direction_strideY:1
+值类型：integer
+
+C-d-24：animation_direction_starting（多向动画朝向）
+描述：第一帧的方向，取决于您的素材。您要考虑转向后避免正负数交替现象，否则会导致素材朝向异常。
+正确例子：animation_direction_starting:90
+值类型：float
+
+C-d-25：disableLowHpFire（禁用低生命冒火）
+描述：禁用低生命值时冒火的视觉效果
+正确例子：disableLowHpFire:true
+值类型：boolean
+
+C-d-26：disableLowHpSmoke（禁用低生命冒烟）
+描述：禁用低生命值时冒烟的视觉效果
+正确例子：disableLowHpSmoke:true
+值类型：boolean
+
+C-d-27：showTransportBar（显示运输条）
+描述：填true时显示运输条,false禁用。默认为true.
+正确例子：showTransportBar:false
+值类型：boolean
+
+C-d-28：showHealthBar（显示生命条）
+描述：填true时显示生命条,false禁用。默认为true.
+正确例子：showHealthBar:false
+值类型：boolean
+
+C-d-29：showHealthBarChanges（显示生命条变动）
+描述：填true时显示生命条的生命变动条（黄条）
+正确例子：showHealthBarChanges:false
+值类型：boolean
+
+C-d-30：showEnergyBar（显示能量条）
+描述：填true时显示能量条,false禁用。默认为true.
+正确例子：showEnergyBar:false
+值类型：boolean
+
+C-d-31：showShieldBar（显示护盾条）
+描述：填true时显示护盾条,false禁用。默认为true.
+正确例子：showShieldBar:false
+值类型：boolean
+
+C-d-32：showQueueBar（显示队列条）
+描述：填true时显示操作、生成的队列条,false禁用。默认为true.
+正确例子：showQueueBar:false
+值类型：boolean
+
+C-d-33：showShotDelayBar（显示开火后的冷却条）
+描述：(默认为true) - 用于显示开火速度慢的炮塔的冷却指示条(译者注:原文calldown似乎有误，应为cooldown)
+正确例子：showShotDelayBar:false
+值类型：boolean
+
+C-e：特殊键
+
+C-e-1：imageSmoothing（图像平滑）
+描述：让图像变得平衡，这在可以避免一些情况产生的锯齿。（这影响渲染性能）
+正确例子：imageSmoothing:true
+值类型：boolean
+
+C-e-2：imageSmoothingWhenZoomedIn（在缩放时图像依然平滑）
+描述：同上
+正确例子：imageSmoothingWhenZoomedIn:true
+值类型：boolean
+
+C-f：不建议使用的代码
+
+C-f-1：animation_TYPE_[animationKey]（动画_类型_[动画节代码]）
+描述：大部分建议改用[animation]部分；TYPE的值目前可以是：空闲时（idle），移动中（moving），攻击时（attack）
+正确例子：animation_moving_body_4s:{frame:1,scale:0.5}
+值类型：special
+
+D：攻击[attack]
+D-a：未分类、D-b：luke不推荐使用的键-可以使用、D-c：没有明显作用的键
+
+D-a：未分类
+
+D-a-1：maxAttackRange（攻击距离）
+描述：最大攻击距离。（会乘以globalScale，但不建议使用globalScale）
+正确例子：maxAttackRange:999
+值类型：float
+
+D-a-2：canAttack（可以攻击）
+描述：如果设置为false，则不能攻击任何单位。其他canAttack选项将无效。
+正确例子：canAttack:true
+值类型：boolean
+
+D-a-3：canAttackFlyingUnits（可攻击空中单位）
+描述：可以攻击空中单位，下面的攻击条件代码可于任意炮塔单独设置。
+正确例子：canAttackFlyingUnits:true
+值类型：Logicbooleanean
+
+D-a-4：canAttackLandUnits（可攻击表面单位）
+描述：可以攻击表面单位（包括陆地和水面）
+正确例子：canAttackLandUnits:true
+值类型：Logicbooleanean
+
+D-a-5：canAttackUnderwaterUnits（可攻击水下单位）
+描述：可以攻击水下单位
+正确例子：canAttackUnderwaterUnits:true
+值类型：Logicbooleanean
+
+D-a-6：canAttackNotTouchingWaterUnits（可以攻击非接触水单位）
+描述：可以攻击非接触水单位，默认为true。如果是false，则只能攻击与水接触的单位，不能攻击岸上。用于鱼雷逻辑。也可以根据炮塔需要设置。
+正确例子：canAttackNotTouchingWaterUnits:true
+值类型：Logicbooleanean
+
+D-a-7：canOnlyAttackUnitsWithTags（只攻击带特定标签单位）
+描述：只能攻击带特定标签的单位
+正确例子：canOnlyAttackUnitsWithTags:sp_spy
+值类型：string(s)
+
+D-a-8：canOnlyAttackUnitsWithoutTags（不攻击带特定标签单位）
+描述：不能攻击带特定标签的单位
+正确例子：canOnlyAttackUnitsWithoutTags:sp_tm
+值类型：string(s)
+
+D-a-9：setMainTurretAs（设置主炮塔）
+描述：设置主炮塔，有些代码要锁定主炮塔，对其有用。
+正确例子：setMainTurretAs:1
+值类型：turret code name
+
+D-a-10：turretMultiTargeting（每个炮塔向不同目标射击）
+描述：允许每个炮塔同时向不同的目标射击。如果使用[turretlimitingAngle(限制角度)非常有用
+正确例子：turretMultiTargeting:true
+值类型：boolean
+
+D-a-11：isMelee（近战）
+描述：近战单位。与低攻击范围配合使用（例如maxAttackRange：9）可使自身和目标半径添加到范围内，并影响AI。
+正确例子：isMelee:true
+值类型：boolean
+
+D-a-12：meleeEngangementDistance（近战索敌距离）
+描述：（必须要有isMelee:true否则使用该key会报错）使部队游猎，自动移动以攻击附近的敌方部队。近战默认为250，非近战默认为0（即使非近战也可以使用）
+约束：使用该键前需要先设置 isMelee:true，否则会报错
+正确例子：meleeEngangementDistance:255
+错误例子：meleeEngangementDistance:255（未设置 isMelee:true）
+值类型：integer
+
+D-a-13：turretRotateWithBody（炮塔随主体旋转）
+描述：炮塔随主体旋转。默认true
+正确例子：turretRotateWithBody:true
+值类型：boolean
+
+D-a-14：attackMovement（攻击移动类型）
+描述：移动攻击类型。实际上，这条代码内可以任意填写值，但enum值例如normal/bomber。能量耗尽时，轰炸机攻击运动将后退。可填moveaway，strafing但无效。
+正确例子：attackMovement:&#%<>?!；attackMovement:bomber
+值类型：string
+
+D-a-15：dieOnAttack（自杀攻击）
+描述：攻击时自毁。
+正确例子：dieOnAttack:true
+值类型：boolean
+
+D-a-16：removeOnAttack（移除攻击）
+描述：攻击时移除自身.
+正确例子：removeOnAttack:true
+值类型：boolean
+
+D-a-17：isFixedFiring（固定射击）
+描述：必须将身体对准目标射击。通常会使得部队需要停下来才能瞄准和射击。比如火炮。
+正确例子：isFixedFiring:true
+值类型：boolean
+
+D-a-18：aimOffsetSpread（瞄准偏移）
+描述：将每次攻击时的偏移量乘以目标半径。默认为0.6。设为0则不偏移，对范围武器影响较大。
+正确例子：aimOffsetSpread:0
+值类型：float
+
+D-a-19：stopTargetingAfterFiring（自动停火）
+描述：单位射击后停止瞄准。很少使用或需要。如用于您不希望胡乱攻击浪费弹药的单位。
+正确例子：stopTargetingAfterFiring:true
+值类型：boolean
+
+D-a-20：disablePassiveTargeting（不能主动攻击）
+描述：单位只攻击手动选择的目标。很少使用或需要。如用于自爆卡车守家，如果自动攻击敌人就太蠢了。
+正确例子：disablePassiveTargeting:true
+值类型：boolean
+
+D-a-21：showRangeUIGuide（显示范围UI）
+描述：showRangeUIGuide只在选中单位时有效，在放置单位时无效。显示攻击范围的白圈，默认true。
+正确例子：showRangeUIGuide:false
+值类型：boolean
+
+D-a-22：shootDelayMultiplier（开火间隔乘数）
+描述：默认为1。可以在setUnitStats动态改变
+正确例子：shootDelayMultiplier:1
+值类型：float
+
+D-a-23：shootDamageMultiplier（开火伤害乘数）
+描述：默认为1。可以在setUnitStats动态改变
+正确例子：shootDamageMultiplier:1
+值类型：float
+
+D-b：luke不推荐使用的键-可以使用
+分类说明：但最好在每个炮塔上进行单独设置
+
+D-b-1：turretSize（炮塔大小）
+描述：设置所有炮塔大小。填数值，按像素计算，不决定素材大小，而是以此为半径的开火位置。
+正确例子：turretSize:10
+值类型：float
+
+D-b-2：turretTurnSpeed（炮塔转速）
+描述：炮塔转速，单位是每帧旋转角度。
+正确例子：turretTurnSpeed:1
+值类型：float
+
+D-b-3：shootDelay（攻击间隔）
+描述：开火间隔，也可以在每个转塔上使用延迟
+正确例子：shootDelay:233
+值类型：float
+
+D-c：没有明显作用的键
+
+D-c-1：attackMovementSpeed（攻击时移动速度）
+描述：几乎无影响
+正确例子：attackMovementSpeed:0
+值类型：float
+
+D-c-2：attackMovementSpread（攻击时移动散布）
+描述：几乎无影响
+正确例子：attackMovementSpread:0
+值类型：float
+
+E：炮塔[turret_NAME（非必要请填1-31的数字）]
+E-a：未分类、E-b：计时、E-c：射击时、E-d：定位控制、E-e：图形和效果
+
+E-a：未分类
+
+E-a-1：x（X坐标）
+描述：坐标X
+正确例子：x:10
+值类型：float
+
+E-a-2：y（Y坐标）
+描述：坐标Y
+正确例子：y:10
+值类型：float
+
+E-a-3：height（炮塔高度）
+描述：(用于3d单位,实测链接的炮塔也会跟着改变高度)to help placement on 3d style units
+正确例子：height:1
+值类型：float
+
+E-a-4：copyFrom（复制数据自）
+描述：复制指定炮塔的所有值，作为该炮塔的默认值。新写代码重复时则覆盖掉它。
+正确例子：copyFrom: 1
+值类型：turret code name
+
+E-a-5：projectile（抛射体）
+描述：使用此抛射体。默认为第一个抛射体。
+正确例子：projectile:torpedo
+值类型：projectile code name
+
+E-a-6：altProjectile（关联抛射体）
+描述：当altProjectileCondition为true时，从此炮塔发射的抛射体。
+正确例子：altProjectile:lowEnergy
+值类型：projectile code name
+
+E-a-7：altProjectileCondition（关联抛射体条件）
+描述：用于altProjectile
+正确例子：altProjectileCondition:if not self.energy(full=true)
+值类型：Logicbooleanean
+
+E-a-8：barrelX（抛射体x）
+描述：默认值为0。控制抛射体生成的X轴位置。
+正确例子：barrelX:0
+值类型：float
+
+E-a-9：barrelY（抛射体y）
+描述：默认为大0。注意：size和barrelY含义相同
+正确例子：barrelY:10
+值类型：float
+
+E-a-10：barrelHeight（抛射体高度）
+描述：高度（用于3d）。影响抛射体产生的高度。
+正确例子：barrelHeight:10
+值类型：float
+
+E-a-11：size（炮塔大小）
+描述：控制炮塔中心与抛射体丸产生点之间的距离。
+正确例子：size: 5
+值类型：float
+
+E-a-12：turnSpeed（炮塔转速）
+描述：炮塔最大转动速度。单位度每帧。
+正确例子：turnSpeed:5
+值类型：float
+
+E-a-13：turnSpeedAcceleration（炮塔旋转加速度）
+描述：炮塔加速度，默认设置为禁用，并使用全转速度。
+正确例子：turnSpeedAcceleration:1
+值类型：float
+
+E-a-14：turnSpeedDeceleration（炮塔旋转减速度）
+描述：默认为turnSpeedAcceleration。将此值设置为高于转弯加速度可能会允许更快地命中目标
+正确例子：turnSpeedDeceleration:1
+值类型：float
+
+E-a-15：idleDir（闲时角度）
+描述：闲置时角度。
+正确例子：idleDir:90
+值类型：float
+
+E-a-16：idleDirReversing（闲时角度反转）
+描述：允许闲置时角度反转。除非连接到另一个炮塔（否则连接的炮塔在反转时通常会旋转），否则默认为idleDir + 180。如重坦逆行时炮塔转向。
+正确例子：idleDirReversing:1
+值类型：float
+
+E-a-17：shouldResetTurret（空闲自动归位）
+描述：默认为true。 填false时禁止炮塔自动归位。
+正确例子：shouldResetTurret:false
+值类型：boolean
+
+E-a-18：idleSweepAngle（空闲扫描角度）
+描述：炮塔闲时扫描角度。这一系列用于设置炮塔闲置时候转圈警戒动作。
+正确例子：idleSweepAngle:45
+值类型：float
+
+E-a-19：idleSweepDelay（空闲扫描间隔）
+描述：炮塔闲时扫描间隔，多久动一次。
+正确例子：idleSweepDelay:120
+值类型：float
+
+E-a-20：idleSweepSpeed（空闲扫描速度）
+描述：炮塔闲时扫描转向的速度。
+正确例子：idleSweepSpeed:0.2
+值类型：float
+
+E-a-21：idleSweepCondition（空闲扫描条件）
+描述：炮塔闲时扫描的条件，比如单位移动但没攻击时炮塔确实是闲置的，但这时可能不该旋转。
+正确例子：idleSweepCondition:if not self.isMoving()
+值类型：Logicbooleanean
+
+E-a-22：idleSweepAddRandomDelay（空闲扫描随机延迟）
+描述：炮塔闲时扫描的随机延迟
+正确例子：idleSweepAddRandomDelay:40
+值类型：float
+
+E-a-23：idleSweepAddRandomAngle（空闲扫描随机角度）
+描述：炮塔闲时扫描的随机角度
+正确例子：idleSweepAddRandomAngle:10
+值类型：float
+
+E-a-24：attachedTo（链接到）
+描述：要连接的另一个炮塔的ID，将相对于它定位，并随其旋转。
+正确例子：attachedTo:1
+值类型：turret code name
+
+E-a-25：slave（隶属）
+描述：锁定此转塔的方向，并为附加的转塔发射冷却时间。常用于多炮管单位。
+正确例子：slave:true
+值类型：boolean
+
+E-a-26：isMainNanoTurret（是主构建炮塔）
+描述：默认为false。用于创建建筑物的炮塔。只能在一个炮塔上为true，并且canShoot设置为false。
+正确例子：isMainNanoTurret:true
+值类型：boolean
+
+E-a-27：energyUsage（能量需求）
+描述：发射武器所需的能量。与resourceUsage相同：energy = X
+正确例子：energyUsage:1
+值类型：float
+
+E-a-28：resourceUsage（资源需求）
+描述：可以使用资金/能源/生命/护盾/弹药等。如果不符合条件则停止攻击。credits/energy/hp/shield/ammo
+正确例子：resourceUsage: credits=5, energy=5, hp=100, shield=5, ammo=1
+值类型：price(s)
+
+E-b：计时
+
+E-b-1：delay（开火间隔）
+描述：设置攻击间隔，覆盖全局炮塔间隔数据。
+正确例子：delay:60
+值类型：float
+
+E-b-2：linkDelayWithTurret（链接间隔）
+描述：当另一炮塔开火时，该炮塔上的冷却延迟将被重置/删除
+正确例子：linkDelayWithTurret:1
+值类型：turret code name
+
+E-b-3：warmup（预热）
+描述：射击前延迟。需要准备多长时间才能攻击，可以制作出蓄力效果。
+正确例子：warmup:10
+值类型：time
+
+E-b-4：warmupCallDownRate（预热下降速度）
+描述：停止攻击后预热条下降速度，只支持浮点
+正确例子：warmupCallDownRate:0.6
+值类型：float
+
+E-b-5：warmupNoReset（预热不重置）
+描述：默认为false。射击后未重设真正的预热时。与warmupCallDownRate一起使用
+正确例子：warmupNoReset:true
+值类型：boolean
+
+E-b-6：warmupShootDelayTransfer（开火间隔过渡）
+描述：默认值为0，这是一个乘数，用于通过预热值减少下一次开火延迟。与warmupNoReset一起使用时，可以使攻击速度越来越快。
+正确例子：warmupShootDelayTransfer:17
+值类型：float
+
+E-c：射击时
+
+E-c-1：onShoot_freezeBodyMovementFor（射击时冻结主体）
+描述：射击时禁止运动。
+正确例子：onShoot_freezeBodyMovementFor:1.2s
+值类型：time
+
+E-c-2：barrelOffsetX_onOddShots（奇数射击时抛射体偏移）
+描述：默认0。在奇数射击时横向偏移，用于简化双管单位制作。
+正确例子：barrelOffsetX_onOddShots:100
+值类型：float
+
+E-c-3：yAxisScaling（Y轴比例）
+描述：炮塔的x和y坐标会乘以这个代码所填的值
+正确例子：yAxisScaling:2
+值类型：float
+
+E-d：定位控制
+
+E-d-1：canShoot（可以开火）
+描述：可以开火，默认为true
+正确例子：canShoot:true
+值类型：boolean
+
+E-d-2：canAttack（可以攻击）
+描述：可以攻击，默认为true，不能和canShoot连用
+约束：不能与 canShoot 同时使用
+正确例子：canAttack:true
+值类型：boolean
+
+E-d-3：canAttackFlyingUnits（可攻击空中单位）
+描述：可以攻击空中单位，覆盖[attack]的设定。
+正确例子：canAttackFlyingUnits:true
+值类型：Logicbooleanean
+
+E-d-4：canAttackLandUnits（可攻击表面单位）
+描述：可以攻击表面单位（包括陆地和水面）
+正确例子：canAttackLandUnits:true
+值类型：Logicbooleanean
+
+E-d-5：canAttackUnderwaterUnits（可攻击水下单位）
+描述：可以攻击水下单位
+正确例子：canAttackUnderwaterUnits:true
+值类型：Logicbooleanean
+
+E-d-6：canAttackNotTouchingWaterUnits（可以攻击非接触水单位）
+描述：可以攻击非接触水单位，默认为true。如果是false，则只能攻击与水接触的单位，不能攻击岸上。用于鱼雷逻辑。也可以根据炮塔需要设置。
+正确例子：canAttackNotTouchingWaterUnits:true
+值类型：Logicbooleanean
+
+E-d-7：canOnlyAttackUnitsWithTags（只攻击带特定标签单位）
+描述：只能攻击带特定标签的单位
+正确例子：canOnlyAttackUnitsWithTags:sp_spy
+值类型：string(s)
+
+E-d-8：canOnlyAttackUnitsWithoutTags（不攻击带特定标签单位）
+描述：不能攻击带特定标签的单位
+正确例子：canOnlyAttackUnitsWithoutTags:sp_tm
+值类型：string(s)
+
+E-d-9：canAttackCondition（攻击条件）
+描述：攻击需要满足条件。
+正确例子：canAttackCondition: if not self.flying
+值类型：Logicbooleanean
+
+E-d-10：clearTurretTargetAfterFiring（射击后重置炮塔目标）
+描述：射击后重置炮塔目标。
+正确例子：clearTurretTargetAfterFiring:true
+值类型：boolean
+
+E-d-11：limitingRange（限制范围）
+描述：限制此炮塔的最远攻击范围。不要将此代码应用到所有炮塔，如果需要则设置maxAttackRange。
+正确例子：limitingRange:150
+值类型：float
+
+E-d-12：limitingAngle（限制角度）
+描述：与idleDir配合。炮塔只能以+/-此角度进行攻击。
+正确例子：limitingAngle:60
+值类型：float
+
+E-d-13：limitingMinRange（最小距离）
+描述：设置炮塔的最小攻击范围，不能攻击此范围内单位，也就是死角。
+正确例子：limitingMinRange: 60
+值类型：float
+
+E-d-14：canAttackMaxAngle（可攻击最大角度）
+描述：设置炮塔的最大射击角度。如果单位在可攻击角度外则不会开火。默认值为5，不要设置得更低。可以设置为181，即不需要转向就可发射抛射体。
+正确例子：canAttackMaxAngle:90
+值类型：float
+
+E-d-15：interceptProjectiles_withTags（拦截抛射体需有标签）
+描述：拦截具有此标签的抛射体，目前铁锈用于反核武器。
+正确例子：interceptProjectiles_withTags: nuke
+值类型：string(s)
+
+E-d-16：interceptProjectiles_andTargetingGroundUnderDistance（拦截抛射体检索范围）
+描述：守护的范围，只有当敌方攻击目标地点落在此圈子内时才考虑拦截。
+正确例子：interceptProjectiles_andTargetingGroundUnderDistance: 500
+值类型：float
+
+E-d-17：interceptProjectiles_andUnderDistance（拦截抛射体攻击范围）
+描述：默认值为2000，当抛射体到达这个距离时才开始发射拦截。
+正确例子：interceptProjectiles_andUnderDistance: 1600
+值类型：float
+
+E-d-18：interceptProjectiles_andOverHeight（拦截抛射体高度）
+描述：需要超过此高度才会拦截。默认值为0.
+正确例子：interceptProjectiles_andOverHeight:50
+值类型：float
+
+E-d-19：laserDefenceEnergyUse（激光防御能量需求）
+描述：炮塔启用激光防御拦截敌方抛射体。还应在core中设置energyMax。
+正确例子：laserDefenceEnergyUse:1
+值类型：float
+
+E-d-20：aimOffsetSpread（瞄准偏移）
+描述：将每次攻击时的偏移量乘以目标半径。默认为0.6。设为0则不偏移，对范围武器影响较大。
+正确例子：aimOffsetSpread:0
+值类型：float
+
+E-e：图形和效果
+
+E-e-1：invisible（隐藏炮塔图像）
+描述：即不显示炮塔本身图像，但是攻击什么的还是可以。
+正确例子：invisible:true
+值类型：Logicbooleanean
+
+E-e-2：image（图像）
+描述：使用自定义图片。覆盖单位的主炮塔图像
+正确例子：image:shibaingtooth.png
+值类型：file
+
+E-e-3：image_applyTeamColors（图像应用阵营色）
+描述：给炮塔 image 也应用阵营色。未填写时默认继承单位整体的阵营色设置。
+正确例子：image_applyTeamColors:true
+值类型：boolean
+
+E-e-4：image_drawOffsetX（图像绘制偏移x）
+描述：炮塔图像在X轴偏移。
+正确例子：image_drawOffsetX
+值类型：float
+
+E-e-5：image_drawOffsetY（图像绘制偏移y）
+描述：炮塔图像在Y轴偏移。
+正确例子：image_drawOffsetY
+值类型：float
+
+E-e-6：chargeEffectImage（充能效果图像）
+描述：预热时的充能效果。默认是由小变大。
+正确例子：chargeEffectImage:a.png
+值类型：file
+
+E-e-7：warmupStartEffect（预热效果）
+描述：开火延迟时产生效果。
+正确例子：warmupStartEffect
+值类型：effect(s) code name
+
+E-e-8：shoot_sound（开火音效）
+描述：开火音效，填声音文件。有以下内置条目。attack、move、click、missile_fire、missile_hit、unit_explode、buiding_explode、；tank_firing、cannon_firing、gun_fire、lighting_burst、plasma_fire、plasma_fire2、firing3、firing4、large_gun_fire1、；large_gun_fire2、bug_die、bug_attack、interface_error、nuke_explode、nuke_launch、laser_deflect、laser_deflect2
+正确例子：shoot_sound:move:0.5
+值类型：file(s)
+
+E-e-9：shoot_sound_vol（开火音效大小）
+描述：播放声音大小。
+正确例子：shoot_sound_vol:
+值类型：float
+
+E-e-10：shoot_flame（开火动画）
+描述：开火动画，内置参考表末尾。Luke推荐为：small, large, smoke, shockwave（小，大，烟，冲击波）。可以自定义。；其余有：medium，largeExplosion，smallExplosion，resourcePoolSmoke，noneExplosion（中等，大爆炸，小爆炸，资源池的绿色烟，没有爆炸）
+正确例子：shoot_flame: smoke；shoot_flame: CUSTOM:lightFade
+值类型：effect(s) code name
+
+E-e-11：shoot_light（开火闪光）
+描述：开火时闪光，16进制argb格式。#AARRGGBB,透明度，红，绿，蓝
+正确例子：shoot_light:#afafaf；shoot_light:white
+值类型：color
+
+E-e-12：idleSpin（闲时转速）
+描述：炮塔闲置时的旋转速度,单位度每帧。
+正确例子：idleSpin:2
+值类型：float
+
+E-e-13：onShoot_playAnimation（开火播放动画）
+描述：开火后播放[Animation]中的自定义动画
+正确例子：onShoot_playAnimation:animation_1
+值类型：animation(s) code name
+
+E-e-14：onShoot_triggerActions（开火触发行为）
+描述：每次这个炮塔开火时触发这些动作
+正确例子：onShoot_triggerActions:foxsay
+值类型：(hidden) action(s) code name
+
+E-e-15：unloadUpToXUnitsAndGiveAttackOrder（卸载单位并赋予攻击目标）
+描述：在炮塔炮筒位置卸下X个单位，并让它们攻击炮塔指定的目标。
+正确例子：unloadUpToXUnitsAndGiveAttackOrder:5
+值类型：integer
+
+E-e-16：recoilOffset（后坐力大小）
+描述：开火后向前或向后推动炮塔，以产生后坐力。填像素。
+正确例子：recoilOffset:-10
+值类型：float
+
+E-e-17：recoilOutTime（后坐力速度）
+描述：开火后到达偏移位置的时间
+正确例子：recoilOutTime:2
+值类型：float
+
+E-e-18：recoilReturnTime（后坐力恢复）
+描述：开火后回到默认位置所需时间。
+正确例子：recoilReturnTime:15
+值类型：float
+
+E-e-19：showRangeUIGuide（显示范围UI）
+描述：显示攻击范围的白圈。默认true.
+正确例子：showRangeUIGuide:false
+值类型：boolean
+
+F：抛射体[projectile_NAME]
+F-a：未分类、F-b：伤害、F-c：运动、F-d：图形和效果
+
+F-a：未分类
+
+F-a-1：life（存在时间）
+描述：开火后抛射体在没命中时的存活时间，单位为帧。60为1s。多少合适取决于速度与射程。
+正确例子：life:120
+值类型：float
+
+F-a-2：delayedStartTimer（延迟时间）
+描述：抛射体发射延迟时间。
+正确例子：delayedStartTimer:15
+值类型：time
+
+F-a-3：interceptProjectile_removeTargetLifeOnly（拦截抛射体移除目标存活时间）
+描述：默认值为false；当为false时，抛射体会被移除。true时使被击中的抛射体爆炸或分裂。用于设定命中抛射体时是否执行分裂逻辑。
+正确例子：interceptProjectile_removeTargetLifeOnly:false
+值类型：boolean
+
+F-a-4：deflectionPower（激光拦截耗能）
+描述：默认值为1。此抛射体被激光防御摧毁所需的能量。 -1为禁止拦截。（对特殊武器如火焰）
+正确例子：deflectionPower:-1
+值类型：float
+
+F-a-5：explodeOnEndOfLife（寿终爆炸）
+描述：默认为false。True则会在寿命终结时爆炸，并产生其命中时该有的效果。而不是直接消失。
+正确例子：explodeOnEndOfLife:true
+值类型：boolean
+
+F-a-6：autoTargetingOnDeadTarget（自动切换目标）
+描述：如果目标死亡则自动切换单位。填true时如果有代码"targetGround:true"抛射体将会追踪距离它最近的单位。如果没有"targetGround"时将会在单位死亡后再改变目标。
+正确例子：autoTargetingOnDeadTarget:true
+值类型：boolean
+
+F-a-7：autoTargetingOnDeadTargetRange（自动切换目标检索范围）
+描述：当旧目标死亡时选择新目标的范围
+正确例子：autoTargetingOnDeadTargetRange:45
+值类型：float
+
+F-a-8：autoTargetingOnDeadTargetLead（自动切换目标预判）
+描述：尝试新的目标时的预判
+正确例子：autoTargetingOnDeadTargetLead:1
+值类型：float
+
+F-a-9：unloadUpToXUnitsFromSource（卸载单位至命中地）
+描述：将指定个数单位卸载到抛射体爆炸位置。
+正确例子：unloadUpToXUnitsFromSource:1
+值类型：integer
+
+F-a-10：teleportSource（传送）
+描述：将单位移动到抛射体爆炸的位置，用于传送自身。
+正确例子：teleportSource:true
+值类型：boolean
+
+F-a-11：spawnUnit（产生单位）
+描述：在抛射体丸爆炸位置产生这种单位
+正确例子：spawnUnit:heavyTank,tank*5,hoverTank(offsetX=10)
+值类型：unit name(s)
+
+F-a-12：convertHitToSourceTeam（命中时更改所属）
+描述：将更改被命中的单位转换队伍为自身所属。
+正确例子：convertHitToSourceTeam:true
+值类型：boolean
+
+F-a-13：tags（标签）
+描述：用于抛射体拦截功能。
+正确例子：tags:nuke
+值类型：string(s)
+
+F-a-14：flameWeapon（火焰武器）
+描述：命中时产生小火焰（仅用于装饰）
+正确例子：flameWeapon:true
+值类型：boolean
+
+F-a-15：spawnProjectilesOnEndOfLife（在寿命结束时生成抛射体）
+描述：填抛射体名。在寿命(life)结束时生成抛射体。生成抛射体逻辑具体参数参考后面生成抛射体大项。这简化了过去许多需要多炮塔(如贯穿攻击)或是生成辅助单位才能实现的操作。
+正确例子：spawnProjectilesOnEndOfLife:torpedo_split(offsetDir=90),torpedo_split(offsetDir=-90)
+值类型：projectile(s) code name
+
+F-a-16：spawnProjectilesOnExplode（在爆炸时生成抛射体）
+描述：填抛射体名。只在爆炸时生成抛射体，如果耗光life则不会生成。
+正确例子：spawnProjectilesOnExplode:shiba(offsetDir=60,recursionLimit=6)
+值类型：projectile(s) code name
+
+F-a-17：spawnProjectilesOnCreate（在创建时生成抛射体）
+描述：填抛射体名。抛射体创建时生成抛射体。
+正确例子：spawnProjectilesOnCreate:1.5,2,3,4,5
+值类型：projectile(s) code name
+
+F-b：伤害
+
+F-b-1：directDamage（直接伤害）
+描述：击中对目标单位造成伤害。不适用于targetGround:true。
+正确例子：directDamage:999
+值类型：integer
+
+F-b-2：areaDamage（范围伤害）
+描述：范围伤害值，此区域内敌方单位都将受到损伤，默认向边缘递减。
+正确例子：areaDamage:99
+值类型：integer
+
+F-b-3：areaRadius（范围半径）
+描述：范围伤害区域大小，此区域内敌方单位都将受到损伤，默认向边缘递减。数值类型为像素，大小算法为半径，铁锈内地块一格长为20像素。
+正确例子：areaRadius:99
+值类型：float
+
+F-b-4：areaDamageNoFalloff（范围伤害不衰减）
+描述：默认false.为true时范围伤害不再向边缘递减。
+正确例子：areaDamageNoFalloff:true
+值类型：boolean
+
+F-b-5：areaRadiusFromEdge（范围伤害从边缘计算）
+描述：范围伤害将从单位的边缘计算，而不是默认的中心计算。主要用于攻击大型单位。
+正确例子：areaRadiusFromEdge:true
+值类型：boolean
+
+F-b-6：areaExpandTime（范围扩展时间）
+描述：将区域伤害变为爆炸波向边缘扩散。效果如核抛射体。
+正确例子：areaExpandTime:15
+值类型：float
+
+F-b-7：areaHitAirAndLandAtSameTime（范围武器同时攻击空中和地面）
+描述：范围武器将同时打击空中和地面。
+正确例子：areaHitAirAndLandAtSameTime:true
+值类型：boolean
+
+F-b-8：areaHitUnderwaterAlways（范围武器可攻击深海）
+描述：范围武器将可以打击深海单位如潜艇。
+正确例子：areaHitUnderwaterAlways:true
+值类型：boolean
+
+F-b-9：areaIgnoreUnitsCloserThan（范围伤害忽略区域）
+描述：小于此范围的单位不会受到攻击影响。需要比areaRadius小，否则造不成伤害。
+正确例子：areaIgnoreUnitsCloserThan:20
+值类型：float
+
+F-b-10：buildingDamageMultiplier（建筑伤害乘数）
+描述：默认为1。对建筑物伤害乘上此数值，用于伤害修正。比如闪电对建筑物伤害低，火焰对建筑物伤害高。
+正确例子：buildingDamageMultiplier:0.5
+值类型：float
+
+F-b-11：shieldDamageMultiplier（护盾伤害乘数）
+描述：默认为1。对护盾伤害乘数。如0对护盾不造成伤害，2对护盾造成双倍伤害
+正确例子：shieldDamageMultiplier:2
+值类型：float
+
+F-b-12：shieldDefectionMultiplier（护盾阻挡乘数）
+描述：护盾阻挡乘数，填0则可无视护盾，同时对单位和盾造成伤害。；在此代码所填的值为负数时，公式如下：默认伤害+对盾造成的伤害*护盾阻挡乘数的相反数=实际伤害
+正确例子：shieldDefectionMultiplier:0
+值类型：float
+
+F-b-13：hullDamageMultiplier（护盾损伤乘数）
+描述：可以用来制造只影响护盾的电磁脉冲武器。0忽略单位，只伤害护盾
+正确例子：hullDamageMultiplier:0
+值类型：float
+
+F-b-14：ignoreParentShootDamageMultiplier（忽略父单位射击伤害乘数）
+描述：忽略父单位射击伤害乘数
+正确例子：ignoreParentShootDamageMultiplier:true
+值类型：boolean
+
+F-b-15：armourIgnoreAmount（无视装甲数量）
+描述：无视目标装甲数量并造成伤害。
+正确例子：armourIgnoreAmount:10
+值类型：float
+
+F-b-16：friendlyFire（友伤）
+描述：范围武器有友伤，可以伤害自己单位。铁锈限制不能对盟友有伤害。负数友伤可以用于范围维修，如果修盟友则需要用中立单位实现。参数（false，true，only-ignoreEnemy）（假，真，忽略敌人的友伤）
+正确例子：friendlyFire: false/true/only-ignoreEnemy
+值类型：boolean/enum
+
+F-b-17：mutatorX_ifUnitWithTags（修正需要标签）
+描述：伤害修正所需标签，仅对携带标签单位有效。否则为原始伤害。
+正确例子：mutator???？？？_ifUnitWithTags: AAA
+值类型：string(s)
+
+F-b-18：mutatorX_ifUnitWithoutTags（修正除此标签）
+描述：伤害修正除此标签外有效。
+正确例子：mutator114514_ifUnitWithoutTags: strongArmour
+值类型：string(s)
+
+F-b-19：mutatorX_directDamageMultiplier（修正直接伤害）
+描述：伤害修正,直接伤害(directDamage)乘数。比如直接伤害100，这里填2，对目标就造成200伤害。
+正确例子：mutatorABC_directDamageMultiplier:2
+值类型：float
+
+F-b-20：mutatorX_areaDamageMultiplier（修正范围伤害）
+描述：伤害修正,范围伤害(areaDamage)乘数。比如直接伤害100，这里填2，对目标就造成200伤害。
+正确例子：mutator解_areaDamageMultiplier:0.5
+值类型：float
+
+F-b-21：mutatorX_changedExplodeEffect（修正命中效果）
+描述：如果此修正处于有效状态，则更改爆炸效果。
+正确例子：mutator疑_changedExplodeEffect:custom:small
+值类型：effect(s) code name
+
+F-b-22：mutatorX_addResourcesDirectHit（修正直接添加资源）
+描述：伤害修正,用于直接伤害(directDamage)，给目标添加指定资源。用途如给目标资源后，目标检测自身资源然后禁止移动。
+正确例子：mutator一个_addResourcesDirectHit:shibaMove=1
+值类型：(global) resource(s) code name
+
+F-b-23：mutatorX_addResourcesAreaHit（修正区域添加资源）
+描述：伤害修正,用于范围伤害(areaDamage)，给目标添加指定资源。
+正确例子：mutator时_addResourcesAreaHit:shibaMove=1
+值类型：(global) resource(s) code name
+
+F-c：运动
+
+F-c-1：targetGround（目标为地面）
+描述：抛射体瞄准并攻击目标所在的地面，而不是追踪目标。直接伤害(directDamage)将会失效，需要使用areaDamage和areaRadius。
+正确例子：targetGround:true
+值类型：boolean
+
+F-c-2：targetGroundSpread（目标为地面散布）
+描述：填数值，用于目标为地面时随机造成偏差效果
+正确例子：targetGroundSpread:15
+值类型：float
+
+F-c-3：targetGround_includeTargetHeight（目标为地面包括空中目标）
+描述：当 targetGround_includeTargetHeight:true 时，可让 targetGround:true 的抛射体在瞄准空中单位后于空中爆炸。
+正确例子：targetGround_includeTargetHeight:true
+值类型：boolean
+
+F-c-4：targetGroundHeightOffset（目标为地面高度偏移）
+描述：在目标上方或下方射击。可能对分裂和落下的抛射体有用。
+正确例子：targetGroundHeightOffset:10
+值类型：float
+
+F-c-5：speed（速度）
+描述：抛射体飞行速度，单位是每帧飞行像素。铁锈地块1格20像素，填1则每秒飞行3格。
+正确例子：speed:2
+值类型：float
+
+F-c-6：targetSpeed（到达速度）
+描述：加速到这个速度
+正确例子：targetSpeed:8
+值类型：float
+
+F-c-7：targetSpeedAcceleration（加速度）
+描述：加速度，控制targetSpeed的速度提升
+正确例子：targetSpeedAcceleration:1
+值类型：float
+
+F-c-8：ballistic（弹道）
+描述：弹道抛射体效果，使抛射体先飞向空中再向下飞，而不是走直线。
+正确例子：ballistic:true
+值类型：boolean
+
+F-c-9：ballistic_delaymove_height（弹道垂直飞行高度）
+描述：弹道抛射体发射初期效果，决定弹道一开始先升高多少，再斜向爬升到最高过渡。
+正确例子：ballistic_delaymove_height:1
+值类型：float
+
+F-c-10：ballistic_height（弹道高度）
+描述：弹道最终高度。
+正确例子：ballistic_height:15
+值类型：float
+
+F-c-11：speedSpread（速度散布）
+描述：随机改变抛射体初始速度
+正确例子：speedSpread:1
+值类型：float
+
+F-c-12：instant（瞬间命中）
+描述：开火时立即击中目标,用于激光、闪电、波束。
+正确例子：instant:true
+值类型：boolean
+
+F-c-13：instantReuseLast（瞬间命中回收最后抛射体）
+描述：用于激光和闪电。激光或闪电命中后还会存在一段时间，当此抛射体命中后，清除上一个抛射体效果。使得只有一个抛射体存在。如使用高频射速变成光束武器，而不是瞎眼叠加。
+正确例子：instantReuseLast:true
+值类型：boolean
+
+F-c-14：instantReuseLast_alsoChangeTurretAim（命中回收抛射体且改变瞄准）
+描述：使炮塔瞄准受到命中目标扫描效果的影响，对光束武器有用
+正确例子：instantReuseLast_alsoChangeTurretAim:true
+值类型：boolean
+
+F-c-15：instantReuseLast_keepAreaDamageList（命中回收抛射体区域伤害列表）
+描述：瞬间命中并回收最后的抛射体并且保持区域伤害列表，默认false,保持列表是1.13的正常行为，造成区域伤害不会第二次生效，但不是很有用。只有当您想要旧的行为时才使用这个。
+正确例子：instantReuseLast_keepAreaDamageList:false
+值类型：boolean
+
+F-c-16：disableLeadTargeting（禁用预判）
+描述：瞄准移动目标时，禁用预判计算。默认为false。
+正确例子：disableLeadTargeting:true
+值类型：boolean
+
+F-c-17：leadTargetingSpeedCalculation（预判计算）
+描述：用于使用targetGround时预判计算。目标计算的预期速度。默认为“targetSpeed”。如果设置则基于speed.
+正确例子：leadTargetingSpeedCalculation:0.5
+值类型：float
+
+F-c-18：initialUnguidedSpeedHeight（初始非制导垂直速度）
+描述：设置抛射体和地面间的垂直速度，利用gravity制造出平滑的抛物线。比较迷，填1左右，重力可以不填。
+正确例子：initialUnguidedSpeedHeight:1
+值类型：float
+
+F-c-19：initialUnguidedSpeedX（初始非相对制导速度X）
+描述：让抛射体以弧线形式移动,负数向左，正数向右。
+正确例子：initialUnguidedSpeedX:3
+值类型：float
+
+F-c-20：initialUnguidedSpeedY（初始非相对制导速度Y）
+描述：修改抛射体的高度，正数向下，负数向上。
+正确例子：initialUnguidedSpeedY:3
+值类型：float
+
+F-c-21：gravity（重力）
+描述：控制地面的抛射体丸的拉力。与initialUnguidedSpeedHeight一起使用。
+正确例子：gravity:0.5
+值类型：float
+
+F-c-22：trueGravity（绝对向重力）
+描述：抛射体在靠近单位时因为有该key会低空飞行一段距离，但注意不要填的太大，否则会直接往屏幕下方飞走。
+正确例子：trueGravity:0.5
+值类型：float
+
+F-c-23：turnSpeed（转弯速度）
+描述：限制抛射体的转弯速度，更好的做出弹道效果。
+正确例子：turnSpeed:2
+值类型：float
+
+F-c-24：turnSpeedWhenNear（靠近时转弯速度）
+描述：用于在抛射体非常接近目标时，默认禁用转弯速度以使其能够命中。
+正确例子：turnSpeedWhenNear:1.25
+值类型：float
+
+F-c-25：wobbleAmplitude（摆动幅度）
+描述：抛射体飞行中摆动的剧烈程度。
+正确例子：wobbleAmplitude:0.2
+值类型：float
+
+F-c-26：wobbleFrequency（摆动频率）
+描述：抛射体飞行中摆动的频率。
+正确例子：wobbleFrequency:0.8
+值类型：float
+
+F-c-27：pushForce（推动力量）
+描述：抛射体丸所携带的“重量”,质量越大，推力越大。推动（或以负值拉动）被击中的单位。除以目标质量
+正确例子：pushForce:2
+值类型：float
+
+F-c-28：pushVelocity（推进速度）
+描述：抛射体爆炸后可用推动单位,推力相对于方向的速度，推动（或以负值拉动）被击中的单位。忽略目标质量
+正确例子：pushVelocity:2
+值类型：float
+
+F-c-29：moveWithParent（随父物体移动）
+描述：当父单位移动时也移动抛射体。对光束效果武器很有用。
+正确例子：moveWithParent:true
+值类型：boolean
+
+F-c-30：sweepOffset（扫描偏移）
+描述：扫描偏移，用于制作类似于两栖护盾坦克的激光武器。对光束效果很有用。
+正确例子：sweepOffset:10
+值类型：float
+
+F-c-31：sweepSpeed（扫描速度）
+描述：扫描速度，用于制作类似于两栖护盾坦克的激光武器。对光束效果很有用。
+正确例子：sweepSpeed:10
+值类型：float
+
+F-c-32：sweepOffsetFromTargetRadius（扫描偏移目标半径）
+描述：以目标半径作为扫描偏移量乘数，用于制作类似于两栖护盾坦克的激光武器。对光束效果很有用。
+正确例子：sweepOffsetFromTargetRadius:0.4
+值类型：float
+
+F-c-33：retargetingInFlight（重新瞄准在飞行时）
+描述：在飞行过程中重新瞄准一个新的目标，非常适合投掷式武器和相互碰撞的抛射体
+正确例子：retargetingInFlight:true
+值类型：boolean
+
+F-c-34：retargetingInFlightSearchDelay（重新瞄准在飞行时搜索延迟）
+描述：寻找新目标之间的时间。默认5
+正确例子：retargetingInFlightSearchDelay:10
+值类型：float
+
+F-c-35：retargetingInFlightSearchRange（重新瞄准在飞行时搜索范围）
+描述：重新选择目标的范围。默认值120
+正确例子：retargetingInFlightSearchRange:45
+值类型：float
+
+F-c-36：retargetingInFlightSearchLead（重新瞄准在飞行时预判）
+描述：引导抛射体试图击中目标。默认15。
+正确例子：retargetingInFlightSearchLead:1
+值类型：float
+
+F-c-37：retargetingInFlightSearchOnlyTags（重新瞄准在飞行时针对标签）
+描述：只针对具有这些标签的单位进行重定向。
+正确例子：retargetingInFlightSearchOnlyTags:tg_project
+值类型：string(s)
+
+F-d：图形和效果
+
+F-d-1：color（颜色）
+描述：使用十六进制值对该抛射体重新着色，它也决定了激光颜色，颜色格式为#AARRGGBB。
+正确例子：color: #bebe50；color:white
+值类型：color
+
+F-d-2：teamColorRatio（阵营色色相）
+描述：将团队颜色混合到抛射体颜色中，填0-1。
+正确例子：teamColorRatio:0.5
+值类型：float
+
+F-d-3：teamColorRatio_sourceRatio（阵营色色相比例）
+描述：将团队颜色混合到抛射体颜色中与原色比例，默认为(1-teamColorRatio)
+正确例子：teamColorRatio_sourceRatio:0.5
+值类型：float
+
+F-d-4：invisible（隐藏）
+描述：隐藏抛射体图像。
+正确例子：invisible:true
+值类型：boolean
+
+F-d-5：image（图像）
+描述：使用自定义图片。覆盖drawType和frame
+正确例子：image:233.png
+值类型：file
+
+F-d-6：shadowFrame（阴影帧）
+描述：定义哪一帧是单位的阴影
+正确例子：shadowFrame:1
+值类型：integer
+
+F-d-7：shadowImage（阴影图像）
+描述：使用自定义图片给抛射体加阴影。
+正确例子：shadowImage:SHADOW:PRO_fd.png
+值类型：file
+
+F-d-8：drawType（绘制类型）
+描述：使用内置抛射体图像。 0:projectiles.png 1:projectiles_large.png 2:projectiles2.png
+正确例子：drawType:1
+值类型：integer
+
+F-d-9：drawSize（绘制大小）
+描述：缩放抛射体大小。默认为1
+正确例子：drawSize:0.5
+值类型：float
+
+F-d-10：frame（帧）
+描述：使用的内置图像帧，编号从零开始。和drawType结合使用。
+正确例子：frame:1
+值类型：integer
+
+F-d-11：hitSound（打击音效）
+描述：启用命中音效，默认true
+正确例子：hitSound:true
+值类型：boolean
+
+F-d-12：explodeEffect（爆炸效果）
+描述：抛射体爆炸效果
+正确例子：explodeEffect: smallExplosion, CUSTOM:myExplodeEffect
+值类型：effect(s) code name
+
+F-d-13：explodeEffectOnShield（护盾上爆炸效果）
+描述：如果目标上有护盾，则使用此效果
+正确例子：explodeEffectOnShield:small
+值类型：effect(s) code name
+
+F-d-14：drawUnderUnits（绘制与单位下）
+描述：绘制于单位下方。
+正确例子：drawUnderUnits:true
+值类型：boolean
+
+F-d-15：effectOnCreate（创建时效果）
+描述：创建时效果，会追随抛射体。
+正确例子：effectOnCreate:large
+值类型：effect(s) code name
+
+F-d-16：shouldRevealFog（揭开迷雾）
+描述：抛射体在爆炸时向玩家揭开迷雾。
+正确例子：shouldRevealFog:true
+值类型：boolean
+
+F-d-17：alwaysVisibleInFog（迷雾中显示）
+描述：抛射体总是在迷雾中显示。
+正确例子：alwaysVisibleInFog:true
+值类型：boolean
+
+F-d-18：nukeWeapon（核武器）
+描述：发射时在迷你地图上显示。还有其他一些效果。
+正确例子：nukeWeapon:true
+值类型：boolean
+
+F-d-19：trailEffect（尾焰）
+描述：设置为true时为默认的尾焰。但也可以指向任何自定义效果，或使用内置效果。
+正确例子：trailEffect:true
+值类型：boolean/effect(s) code name
+
+F-d-20：trailEffectRate（尾焰频率）
+描述：尾焰产生频率，默认为3
+正确例子：trailEffectRate:8
+值类型：float
+
+F-d-21：lightSize（闪光大小）
+描述：抛射体光照大小,单位半径是地块格子
+正确例子：lightSize:2
+值类型：float
+
+F-d-22：lightColor（闪光颜色）
+描述：抛射体光照颜色,不决定激光颜色，激光由color决定。
+正确例子：lightColor: #ffe92b；lightColor:white
+值类型：color
+
+F-d-23：lightCastOnGround（闪光映射到地面）
+描述：将闪光效果映射到地面，如火炮的光和抛射体是分离的。
+正确例子：lightCastOnGround:true
+值类型：boolean
+
+F-d-24：largeHitEffect（大的打击效果）
+描述：为true时会产生大的爆炸效果和声音（仅用于装饰），设为false时会禁用范围武器的冲击波效果。
+正确例子：largeHitEffect:true
+值类型：boolean
+
+F-d-25：lightingEffect（闪电效果）
+描述：将抛射体图像修改为闪电，一般需要instant(瞬间命中)搭配.
+正确例子：lightingEffect:true
+值类型：boolean
+
+F-d-26：laserEffect（激光效果）
+描述：将抛射体图像修改为激光。
+正确例子：laserEffect:true
+值类型：boolean
+
+F-d-27：beamImage（波束图像）
+描述：用于激光效果的主体图像，图像会被复制为多份显示。例如可用于做红警中的正弦波状辐射武器。因为本质是图像拼接,所以长度限制不能小于20
+约束：图像长度不能小于 20
+正确例子：beamImage:shibaray.png
+值类型：file
+
+F-d-28：beamImageOffsetRate（波束偏移频率）
+描述：波束图像的移动频率。
+正确例子：beamImageOffsetRate:0
+值类型：float
+
+F-d-29：beamImageStart（波束开始图像）
+描述：光束动画开火端效果图像
+正确例子：beamImageStart:beam1_start.png
+值类型：file
+
+F-d-30：beamImageEnd（波束命中图像）
+描述：光束动画命中端效果图像
+正确例子：beamImageEnd:beam1_end.png
+值类型：file
+
+F-d-31：beamImageStartRotated（波束始端旋转）
+描述：光束动画开火端效果图像是否以炮塔角度旋转旋转,默认false,不旋转.
+正确例子：beamImageStartRotated:true
+值类型：boolean
+
+F-d-32：beamImageEndRotated（波束末端旋转）
+描述：光束动画命中端效果图像是否旋转,默认false.
+正确例子：beamImageEndRotated:true
+值类型：boolean
+
+G：运动[movement]
+
+G-1：movementType（运动类型）
+描述：定义单位将能够通过的地形以及与单位类型相关的其他属性。类型：无、陆地、建筑、空中、水面、两栖、跨悬崖、跨水和悬崖；NONE、LAND、BUILDING、AIR、WATER、HOVER、OVER_CLIFF、OVER_CLIFF_WATER
+正确例子：movementType: LAND
+值类型：enum
+
+G-2：moveSpeed（移动速度）
+描述：单位的最大移动速度。
+正确例子：moveSpeed: 1.2
+值类型：float
+
+G-3：moveAccelerationSpeed（加速度）
+描述：定义单位加速到最大速度的加速度。
+正确例子：moveAccelerationSpeed: 0.07
+值类型：float
+
+G-4：moveDecelerationSpeed（减速度）
+描述：与加速度相对应得减速度。不要设的太小。
+正确例子：moveDecelerationSpeed: 0.17
+值类型：float
+
+G-5：reverseSpeedPercentage（倒车速度比率）
+描述：0.6默认值。超过0.4会在短距离（以40％的速度）时反转。 如果设置为1前进后退则不转弯。 填0时禁止倒退，必须旋转。
+正确例子：reverseSpeedPercentage: 0
+值类型：float
+
+G-6：landOnGround（降落到地面）
+描述：闲置时使飞行器降落。可以填true/flase/onlyIdle
+正确例子：landOnGround: false
+值类型：boolean/enum
+
+G-7：targetHeight（到达高度）
+描述：默认为0，但如果运动类型为空军则默认为35。
+正确例子：targetHeight: 25
+值类型：float
+
+G-8：targetHeightDrift（高度浮动）
+描述：默认0，空军1.5.单位高度上下浮动高度。
+正确例子：targetHeightDrift: 1
+值类型：float
+
+G-9：startingHeightOffset（创建时高度偏移）
+描述：单位在创建时高度。负数上升比较慢。
+正确例子：startingHeightOffset:100
+值类型：float
+
+G-10：maxTurnSpeed（转弯速度）
+描述：最大转弯速度。
+正确例子：maxTurnSpeed:3
+值类型：float
+
+G-11：turnAcceleration（转弯加速度）
+描述：转弯加速度。
+正确例子：turnAcceleration:1
+值类型：float
+
+G-12：moveSlidingMode（移动后滑动）
+描述：移动后滑动，相当于惯性。和单位的速度，加速度，转弯速度有关。True时受推力影响
+正确例子：moveSlidingMode:true
+值类型：boolean
+
+G-13：moveIgnoringBody（移动忽略转向）
+描述：true效果即不必转弯便能运动，false效果即原地转弯完成才能运动
+正确例子：moveIgnoringBody:true
+值类型：boolean
+
+G-14：moveSlidingDir（移动滑动角度）
+描述：移动滑动角度。无明显效果。
+正确例子：moveSlidingDir:100
+值类型：integer
+
+G-15：joinsGroupFormations（加入队形）
+描述：将单位组成小队。铁锈调集大量部队时将其组成方阵以降低运算压力，但队形可能影响速度或浪费时间。禁用后则不参与组队。
+正确例子：joinsGroupFormations:false
+值类型：boolean
+
+G-16：ignoreMoveOrders（忽略移动指令）
+描述：忽略移动指令,此代码强制要求移动速度为0，适用例子：红警中单位部署忽略移动指令。
+正确例子：ignoreMoveOrders:true
+值类型：boolean
+
+G-17：moveYAxisScaling（Y轴速度比例）
+描述：垂直方向单位移动速度乘数，适用于2.5D，也就是用铁锈模拟3D。典型如红警。
+正确例子：moveYAxisScaling:15.1
+值类型：float
+
+G-18：slowDeathFall（死亡缓慢降落）
+描述：为"true"时，被击毁时降落速度减慢，并且向前滑行一段距离。注意，必须设置死亡图像，不然坠落后会显示生前图像，而不是直接炸掉。
+正确例子：slowDeathFall: true
+值类型：boolean
+
+G-19：slowDeathFallSmoke（死亡降落烟）
+描述：在死亡坠落的时候添加烟作为尾迹
+正确例子：slowDeathFallSmoke: true
+值类型：boolean
+
+G-20：heightChangeRate（高度改变速率）
+描述：单位改变高度的频率，无论是转换还是浮动
+正确例子：heightChangeRate: 3
+值类型：float
+
+G-21：fallingAcceleration（降落加速度）
+描述：单位降落时的加速度
+正确例子：fallingAcceleration:1
+值类型：float
+
+G-22：fallingAccelerationDead（坠毁加速度）
+描述：单位被摧毁时降落的加速度
+正确例子：fallingAccelerationDead:1
+值类型：float
+
+H：AI[ai]
+
+H-1：useAsBuilder（用作建造者）
+描述：作为建造者。如果单位可以建造或维修建筑物，则设置为true。 默认为[core] isBuilder。
+正确例子：useAsBuilder:true
+值类型：boolean
+
+H-2：useAsTransport（用作运输）
+描述：作为载具。如果单位可以运输单位，则默认为true.如果您的单位可以运输又能攻击，则AI可能囤积起来而不攻击，则需要设置false.
+正确例子：useAsTransport:true
+值类型：boolean
+
+H-3：useAsAttacker（用作攻击者）
+描述：是否作为攻击者。
+正确例子：useAsAttacker:true
+值类型：boolean
+
+H-4：useAsHarvester（用作采集）
+描述：作为采集者。如果单位可以回收资源，则默认为true
+正确例子：useAsHarvester:true
+值类型：boolean
+
+H-5：disableUse（禁用）
+描述：禁止AI建立这个单位或建筑物
+正确例子：disableUse:true
+值类型：boolean
+
+H-6：ai_upgradePriority（AI升级优先级）
+描述：升级优先级。默认值为0.06。 设置在0-1之间，越高，表示AI更有可能先于其他升级该单位。
+正确例子：ai_upgradePriority:0.1
+值类型：float
+
+H-7：buildPriority（建造优先级）
+描述：建造优先级，填0-1。 越大越AI越可能造。Luke的的第一座土地工厂使用0.8，空中工厂使用0.48，第一炮塔使用0.47。
+正确例子：buildPriority:0.6
+值类型：float
+
+H-8：noneInBaseExtraPriority（基地内没有时优先级）
+描述：如果AI基地中不存在此单位，则增加其优先级。
+正确例子：noneInBaseExtraPriority:0.2
+值类型：float
+
+H-9：noneGlobalExtraPriority（全图没有时优先级）
+描述：如果此单位在地图上的任何位置都不存在，则增加其优先级。
+正确例子：noneGlobalExtraPriority:0.4
+值类型：float
+
+H-10：nonInBaseExtraPriority（基地内没有时的优先级）
+描述：基地内没有时的优先级
+正确例子：noneInBaseExtraPriority:0.2
+值类型：float
+
+H-11：nonGlobalExtraPriority（全图没有时的优先级）
+描述：如果此单位在地图上的任何位置都不存在，则增加其优先级。
+正确例子：noneGlobalExtraPriority:0.4
+值类型：float
+
+H-12：recommendedInEachBaseNum（推荐在每个基地的数量）
+描述：推荐在每个基地中的数量。
+正确例子：recommendedInEachBaseNum:5
+值类型：integer
+
+H-13：recommendedInEachBasePriorityIfUnmet（推荐条件不满足时优先级）
+描述：如果未满足，推荐在基地中的优先级。
+正确例子：recommendedInEachBasePriorityIfUnmet:0.2
+值类型：float
+
+H-14：upgradedFrom（升级自）
+描述：创建到另一个单位的链接，用于保留同一单位已升级和未升级的计数。
+正确例子：upgradedFrom:炮塔
+值类型：string
+
+H-15：maxGlobal（全图最大数量）
+描述：全图最多拥有的数量。
+正确例子：maxGlobal:10
+值类型：integer
+
+H-16：maxEachBase（每个基地最大数量）
+描述：每个基地最多拥有的数量。
+正确例子：maxEachBase:1
+值类型：integer
+
+H-17：notPassivelyTargetedByOtherUnits（不被动地被其他单位瞄准）
+描述：允许更好的墙壁建筑物，默认情况下，这些建筑物不会瞄准目标。用于围墙（当canAttack=true时使用这条代码会报错）
+约束：使用该键时不能将 canAttack 设为 true
+正确例子：notPassivelyTargetedByOtherUnits:true
+错误例子：notPassivelyTargetedByOtherUnits:true（同时 canAttack:true）
+值类型：boolean
+
+H-18：lowPriorityTargetForOtherUnits（低优先级目标）
+描述：其它单位不优先考虑此单位。用于围墙
+正确例子：lowPriorityTargetForOtherUnits:true
+值类型：boolean
+
+H-19：aiTags（ai标签）
+描述：采集
+
+H-20：whenUsingAsHarvester_recommendedInEachBase（每个基地此采集者数量）
+描述：当此单位用作采集者时，每个基地推荐的采集者数量。
+正确例子：whenUsingAsHarvester_recommendedInEachBase:10
+值类型：integer
+
+H-21：whenUsingAsHarvester_recommendedGlobal（全地图推荐采集者数量）
+描述：当此单位用作采集者时，全图推荐的采集者数量。
+正确例子：whenUsingAsHarvester_recommendedGlobal:20
+值类型：integer
+
+H-22：whenUsingAsHarvester_includeOtherHarvesterCounts（是否算在采集者计数中）
+描述：当此单位用作采集者时，是否算在其它采集者统计中。
+正确例子：whenUsingAsHarvester_includeOtherHarvesterCounts:false
+值类型：boolean
+
+H-23：onlyUseAsHarvester_ifBaseHasUnitTagged（有此标签才作为采集者）
+描述：只有当基地有单位标记时才可以作为采集者使用.
+正确例子：onlyUseAsHarvester_ifBaseHasUnitTagged:maplace
+值类型：string
+
+I：腿脚/胳膊[leg_#] / [arm_#]
+I-a：未分类、I-b：图形和效果
+
+I-a：未分类
+分类说明：腿和胳膊有一个区别，腿可以自由活动，但是胳膊是天生就开了锁定运动的
+
+I-a-1：x（X坐标）
+描述：设置脚在X轴上的位置。
+正确例子：x:15
+值类型：float
+
+I-a-2：y（Y坐标）
+描述：设置脚在Y轴上的位置。
+正确例子：y:15
+值类型：float
+
+I-a-3：alpha（不透明度）
+描述：设置腿脚的透明度(建议0-1)
+正确例子：alpha:0.2
+值类型：float
+
+I-a-4：copyFrom（复制与）
+描述：从另一条腿复制。仅需设置一次腿部值时有用
+正确例子：copyFrom:1
+值类型：integer
+
+I-a-5：attach_x（x轴链接位置）
+描述：在X轴上设置腿部的附着点。
+正确例子：attach_x: -15
+值类型：float
+
+I-a-6：attach_y（Y轴链接位置）
+描述：在Y轴上设置腿部的附着点。
+正确例子：attach_y: 0
+值类型：float
+
+I-a-7：rotateSpeed（旋转速度）
+描述：设置脚旋转速度，非对称情况下很明显。
+正确例子：rotateSpeed:30
+值类型：float
+
+I-a-8：endDirOffset（末端角度偏移值）
+描述：目标脚/末端相对于身体的旋转角度。
+正确例子：endDirOffset:45
+值类型：float
+
+I-a-9：lockMovement（锁定运动）
+描述：禁止使用腿脚，将其锁定到主体。用于将行走单位转换为飞行单。
+正确例子：lockMovement:true
+值类型：boolean
+
+I-a-10：heightSpeed（高度速度）
+描述：移动时脚抬高速度和高度。
+正确例子：heightSpeed:2
+值类型：float
+
+I-a-11：moveSpeed（移动速度）
+描述：腿脚移动速度。
+正确例子：moveSpeed:3
+值类型：float
+
+I-a-12：moveWarmUp（移动延迟）
+描述：腿脚移动延迟
+正确例子：moveWarmUp:15
+值类型：float
+
+I-a-13：holdDisMin（最小移动距离）
+描述：默认值为7。如果相邻的腿还没有重新移动，则至少移动此距离。
+正确例子：holdDisMin:10
+值类型：float
+
+I-a-14：holdDisMax（最大移动距离）
+描述：默认值为16。如果已经移动超过此距离则强制重新放置腿。
+正确例子：holdDisMax:40
+值类型：float
+
+I-a-15：holdDisMin_maxMovingLegs（最大移动腿数目）
+描述：最多移动腿数目
+正确例子：holdDisMin_maxMovingLegs:4
+值类型：integer
+
+I-a-16：hold_moveOnlyIfFurthest（只在最远时保持移动）
+描述：保持移动仅在最远时候。
+正确例子：hold_moveOnlyIfFurthest:true
+值类型：boolean
+
+I-a-17：holdDisMin_checkNeighbours（最小移动距离检查相邻）
+描述：移动最小距离时检查相邻的腿脚。
+正确例子：holdDisMin_checkNeighbours:true
+值类型：boolean
+
+I-a-18：hardLimit（硬性限制）
+描述：默认值为50。强制腿部不要走的超过此数值。最好不要用到。
+正确例子：hardLimit:99
+值类型：float
+
+I-a-19：estimatingPositionMultiplier（预测位置乘数）
+描述：默认值为1。根据单位速度预测单位可用的腿脚放置位置。
+正确例子：estimatingPositionMultiplier:1
+值类型：float
+
+I-b：图形和效果
+
+I-b-1：hidden（隐藏）
+描述：隐藏
+正确例子：hidden:if self.isInWater()
+值类型：Logicbooleanean
+
+I-b-2：image_end（末端图像）
+描述：末端图像，相当于脚。
+正确例子：image_end:爪子.png
+值类型：file
+
+I-b-3：image_end_shadow（末端图像阴影）
+描述：末端图像阴影。
+正确例子：image_end_shadow:SHADOW:爪子.png
+值类型：file
+
+I-b-4：image_end_teamColors（末端图像队伍色）
+描述：末端图像使用阵营色。
+正确例子：image_end_teamColors:true
+值类型：boolean
+
+I-b-5：image_foot（脚图像）
+描述：脚图像，与image_end相同
+正确例子：image_foot:爪子.png
+值类型：file
+
+I-b-6：image_foot_shadow（脚图像阴影）
+描述：脚图像阴影。
+正确例子：image_foot_shadow:SHADOW:爪子.png
+值类型：file
+
+I-b-7：image_middle（中部图像）
+描述：中部图像，相当于腿。
+正确例子：image_middle:腿.png
+值类型：file
+
+I-b-8：image_leg（腿图像）
+描述：腿图像，与image_middle相同
+正确例子：image_leg:腿.png
+值类型：file
+
+I-b-9：liftingHeightOffset（离开高度偏移）
+描述：离开时的脚的高度
+正确例子：liftingHeightOffset:1.2
+值类型：float
+
+I-b-10：targetHeight（目标高度）
+描述：最终高度
+正确例子：targetHeight:1.5
+值类型：float
+
+I-b-11：targetHeightRelative（相对目标高度）
+描述：是否将 targetHeight 视为相对自身的目标高度。true 为相对高度，false 为绝对高度。
+正确例子：targetHeightRelative:true
+值类型：boolean
+
+I-b-12：image_middle_teamColors（腿图像阵营色）
+描述：给腿也用上队伍色
+正确例子：image_middle_teamColors:false
+值类型：boolean
+
+I-b-13：draw_foot_on_top（绘制脚在顶层）
+描述：绘制脚在顶层。
+正确例子：draw_foot_on_top:true
+值类型：boolean
+
+I-b-14：drawOverBody（绘制主体之上）
+描述：绘制在主体之上。
+正确例子：drawOverBody:true
+值类型：boolean
+
+I-b-15：drawUnderAllUnits（绘制所有单位之下）
+描述：绘制所有单位之下。
+正确例子：drawUnderAllUnits:true
+值类型：boolean
+
+I-b-16：drawDirOffset（绘制角度偏移）
+描述：绘制角度偏移。
+正确例子：drawDirOffset:45
+值类型：float
+
+I-b-17：dust_effect（灰尘效果）
+描述：脚落地时产生灰尘。
+正确例子：dust_effect:true
+值类型：boolean
+
+I-b-18：spinRate（自身自动旋转速度）
+描述：使手臂/腿脚一直旋转，像转塔的idleSpin。用处如直升机的螺旋桨。
+正确例子：spinRate:3
+值类型：float
+
+I-b-19：favourOppositeSideNeighbours（偏向于临近一侧）
+描述：填true时，使得左右的腿脚拉开时间差，这样更好看。否则看起来顺拐。计算相邻的X比接近的Y查10倍时间。
+正确例子：favourOppositeSideNeighbours:true
+值类型：boolean
+
+I-b-20：drawLegWhenZoomedOut（缩小时绘制腿）
+描述：在缩小显示倍数(看到东西更多)后绘制腿。False时不绘制。为了提高绘制腿性能，默认值根据单位大小而变化。
+正确例子：drawLegWhenZoomedOut:true
+值类型：boolean
+
+I-b-21：drawFootWhenZoomedOut（缩小时绘制脚）
+描述：在缩小显示倍数(看到东西更多)后绘制脚。False时不绘制。为了提高绘制腿性能，默认值根据单位大小而变化。如果单独设置阴影则可能比较怪异。
+正确例子：drawFootWhenZoomedOut:false
+值类型：boolean
+
+I-b-22：explodeOnDeath（死亡时爆炸）
+描述：单位死亡爆炸时腿脚跟着一起爆炸
+正确例子：explodeOnDeath:false
+值类型：boolean
+
+I-b-23：resetAngle（复位角度）
+描述：复位角度。
+正确例子：resetAngle:45
+值类型：float
+
+J：附属[attachment_NAME]
+
+J-1：x（X坐标）
+描述：子单位x轴位置
+正确例子：x:10
+值类型：float
+
+J-2：y（Y坐标）
+描述：子单位Y轴位置
+正确例子：y:15
+值类型：float
+
+J-3：height（高度）
+描述：子单位高度。
+正确例子：height:3
+值类型：float
+
+J-4：lockDir（锁定角度）
+描述：是否锁定角度
+正确例子：lockDir:true
+值类型：boolean
+
+J-5：idleDir（闲置方向）
+描述：闲置时角度。
+正确例子：idleDir:45
+值类型：integer
+
+J-6：idleDirReversing（闲置方向反转）
+描述：允许朝向反转，比如重坦倒退移动时炮塔反转，而不需要整个单位转向。
+正确例子：idleDirReversing:1
+值类型：float
+
+J-7：isVisible（是可见）
+描述：是可见的。
+正确例子：isVisible:true
+值类型：boolean
+
+J-8：onCreateSpawnUnitOf（创建时生成单位）
+描述：此创造时也产生此子单位。
+正确例子：onCreateSpawnUnitOf:flydog
+值类型：unit name
+
+J-9：canBeAttackedAndDamaged（可被攻击或损坏）
+描述：可以被攻击或受到伤害。
+正确例子：canBeAttackedAndDamaged:true
+值类型：boolean
+
+J-10：isUnselectable（不可选择）
+描述：是不可选择的。
+正确例子：isUnselectable:true
+值类型：boolean
+
+J-11：isUnselectableAsTarget（禁止选择和作为目标）
+描述：默认效果为isUnselectable。可以用来创造不能被选择但是可以被攻击，回收的单位
+正确例子：isUnselectableAsTarget:true
+值类型：boolean
+
+J-12：lockLegMovement（锁定腿脚运动）
+描述：锁定腿脚防止乱动。
+正确例子：lockLegMovement:true
+值类型：boolean
+
+J-13：freezeLegMovement（冻结腿脚运动）
+描述：冻结腿脚防止乱动。
+正确例子：freezeLegMovement:true
+值类型：boolean
+
+J-14：showMiniHp（显示迷你血条）
+描述：指附属单位下面那个又小又细的血条栏
+正确例子：showMiniHp:false
+值类型：boolean
+
+J-15：hideHp（隐藏血量）
+描述：隐藏单位的血量并不显示
+正确例子：hideHp:true
+值类型：boolean
+
+J-16：hidden（隐藏）
+描述：隐藏整个单位
+正确例子：hidden:true
+值类型：boolean
+
+J-17：keepAliveWhenParentDies（保持子存活）
+描述：当此单位死亡时，子单位保持存活。
+正确例子：keepAliveWhenParentDies:true
+值类型：boolean
+
+J-18：setDrawLayerOnTop（绘制于顶层）
+描述：此子单位绘制于顶层。
+正确例子：setDrawLayerOnTop:true
+值类型：boolean
+
+J-19：setDrawLayerOnBottom（绘制于底层）
+描述：此子单位绘制于底层。
+正确例子：setDrawLayerOnBottom:true
+值类型：boolean
+
+J-20：addTransportedUnits（增加被运输单位）
+描述：添加到运输单位槽中。
+正确例子：addTransportedUnits:true
+值类型：boolean
+
+J-21：lockRotation（锁定旋转）
+描述：锁定方向，禁止旋转。
+正确例子：lockRotation:true
+值类型：boolean
+
+J-22：rotateWithParent（子单位一同旋转）
+描述：旋转时子单位是否一同旋转。
+正确例子：rotateWithParent:true
+值类型：boolean
+
+J-23：resetRotationWhenNotAttacking（不攻击时重置角度）
+描述：不攻击时恢复到自身默认角度
+正确例子：resetRotationWhenNotAttacking:true
+值类型：boolean
+
+J-24：deattachIfWantingToMove（移动时脱离）
+描述：若收到移动命令，子单位将自动分离。这包括来自action的路径点。可以用来制作机场。
+正确例子：deattachIfWantingToMove:true
+值类型：boolean
+
+J-25：unloadInCurrentPosition（卸载于此位置）
+描述：卸载单位时在这个位置进行卸载
+正确例子：unloadInCurrentPosition:true
+值类型：boolean
+
+J-26：prioritizeParentsMainTarget（优先考虑父单位的主要目标）
+描述：子单位优先考虑父单位当前的目标。
+正确例子：prioritizeParentsMainTarget:true
+值类型：boolean
+
+J-27：alwaysAllowedToAttackParentsMainTarget（总是攻击父单位的主要目标）
+描述：子单位总是跟随攻击父单位的主要目标。
+正确例子：alwaysAllowedToAttackParentsMainTarget:true
+值类型：boolean
+
+J-28：onlyAttackParentsMainTarget（只攻击父单位的主要目标）
+描述：子单位只会攻击父单位的攻击目标。
+正确例子：onlyAttackParentsMainTarget:true
+值类型：boolean
+
+J-29：canAttack（可攻击）
+描述：默认值为true。设置为false以阻止子单位自动攻击。
+正确例子：canAttack:true
+值类型：boolean
+
+J-30：onParentTeamChangeKeepCurrentTeam（改变队伍时子单位保持原队伍）
+描述：默认值为false。如果为true则父单位改变队伍时子单位不改变队伍。
+正确例子：onParentTeamChangeKeepCurrentTeam:true
+值类型：boolean
+
+J-31：smoothlyBlendPositionWhenExistingUnitAdded（补充时平滑移动）
+描述：补充所装载单位至槽位时平滑移动。
+正确例子：smoothlyBlendPositionWhenExistingUnitAdded:true
+值类型：boolean
+
+J-32：keepWaypointsNeedingMovement（保持需要移动路径点）
+描述：默认值为false。当为false时，队列中任何需要移动才能完成的队列路径点都会被移除。
+正确例子：keepWaypointsNeedingMovement:false
+值类型：boolean
+
+J-33：showAllActionsFrom（显示所有操作来源）
+描述：当被选中时，在父单元列表中显示所有附加单位的动作
+正确例子：showAllActionsFrom:if self.hasFlag(id=1)
+值类型：Logicbooleanean
+
+J-34：createIncompleteIfParentIs（创建随父单位）
+描述：如果父节单位不完整，则创建子单位不完整
+正确例子：createIncompleteIfParentIs:false
+值类型：boolean
+
+J-35：onConvertKeepExistingUnitInSameSlot（转换时附属仍然在同一槽位中）
+描述：转换单位时如果有相同ID的附属槽位则子单位就会在那个槽位中
+正确例子：onConvertKeepExistingUnitInSameSlot:true
+值类型：boolean
+
+J-36：redirectDamageToParent（重定向伤害到父单位）
+描述：将对附属造成的伤害重定向到父单位，而不是伤害子单位自身。
+正确例子：redirectDamageToParent:true
+值类型：boolean
+
+J-37：redirectDamageToParent_shieldOnly（重定向伤害到父单位护盾）
+描述：只将对附属造成的伤害重定向到父单位的护盾，而不是伤害子单位自身。如果盾没了那就伤害自身，如模块蜘蛛。
+正确例子：redirectDamageToParent_shieldOnly:true
+值类型：boolean
+
+K：效果[effect_NAME]
+K-a：未分类、K-b：移动、K-c：图形、K-d：动画
+
+K-a：未分类
+
+K-a-1：life（效果存在时间）
+描述：默认值为200。到时间效果消失。 设置得尽可能低以减少效果开销。
+正确例子：effect:custom:doge
+值类型：float
+
+K-a-2：lifeRandom（效果存在时间随机值）
+描述：效果存在时间的随机范围。
+正确例子：lifeRandom: 12
+值类型：float
+
+K-a-3：alsoEmitEffectsOnDeath（死亡时创建效果）
+描述：在生命耗尽的时候创造这些效果。
+正确例子：alsoEmitEffectsOnDeath:shibadie
+值类型：effect(s) code name
+
+K-a-4：alsoEmitEffects（也创造效果）
+描述：创建时创建更多效果，对于多效果很有用。 注意：创建的效果上的其他“ alsoEmitEffects”将被忽略，禁止套娃。
+正确例子：alsoEmitEffects:custom:doge2
+值类型：effect(s) code name
+
+K-a-5：ifSpawnFailsEmitEffects（如果失败则创建效果）
+描述：如果此效果的“spawnChance”失败，则产生这些效果。
+正确例子：ifSpawnFailsEmitEffects:custom:doge3
+值类型：effect(s) code name
+
+K-a-6：alsoPlaySound（也播放音效）
+描述：播放音效，填文件名或内置。
+正确例子：alsoPlaySound:ao.ogg
+值类型：file(s)
+
+K-a-7：createWhenOffscreen（可创建于画面之外）
+描述：允许在画面之外产生此效果，默认为false。
+正确例子：createWhenOffscreen:true
+值类型：boolean
+
+K-a-8：createWhenZoomedOut（缩小时可产生效果）
+描述：允许缩小时产生此效果，默认值为true
+正确例子：createWhenZoomedOut:true
+值类型：boolean
+
+K-a-9：createWhenOverLiquid（创建于液体上）
+描述：允许在液体上方产生此效果，默认值为true
+正确例子：createWhenOverLiquid:true
+值类型：boolean
+
+K-a-10：createWhenOverLand（创建于陆地上）
+描述：允许在陆地上方产生此效果，默认值为true
+正确例子：createWhenOverLand:true
+值类型：boolean
+
+K-a-11：spawnChance（产生几率）
+描述：默认值1.如果小于1，则效果随机被创建
+正确例子：spawnChance:0.9
+值类型：float
+
+K-a-12：showInFog（在雾中显示）
+描述：默认为false
+正确例子：showInFog:true
+值类型：boolean
+
+K-a-13：delayedStartTimer（延迟创建）
+描述：等待这么久再播放此动画，单位为帧。
+正确例子：delayedStartTimer:10
+值类型：float
+
+K-a-14：delayedStartTimerRandom（延迟创建随机时间）
+描述：等待时间随机变化
+正确例子：delayedStartTimerRandom:10
+值类型：float
+
+K-a-15：liveAfterAttachedDies（目标死后存活）
+描述：目标死后动画继续存活,使用AttachedToUnit时默认为false.
+正确例子：liveAfterAttachedDies:true
+值类型：boolean
+
+K-a-16：priority（优先级）
+描述：默认为high，填不同的值对应不同的效果数量上限，并且通用。verylow/low/high/veryhigh/critical(很低，低，高，很高，至关重要)（上限分别是311，321，331，341，350）
+正确例子：priority:low
+值类型：enum
+
+K-b：移动
+
+K-b-1：attachedToUnit（附着在单位上）
+描述：此效果产生时吸附到目标单位或抛射体。将与之一起移动。
+正确例子：attachedToUnit:true
+值类型：boolean
+
+K-b-2：alwayStartDirAtZero（初始角度总是为零）
+描述：忽略附属单位或者产者的角度。
+正确例子：alwayStartDirAtZero:true
+值类型：boolean
+
+K-b-3：atmospheric（空气效果）
+描述：添加阻力使此效果减慢速度，并添加随机移动。用于模拟尾焰。
+正确例子：atmospheric:true
+值类型：boolean
+
+K-b-4：physics（物理效果）
+描述：撞击地面时反抛射体。需要高度才能生效。
+正确例子：physics:true
+值类型：boolean
+
+K-b-5：physicsGravity（物理重力）
+描述：默认为1。physics:true时的垂直方向加速度。
+正确例子：physicsGravity:1
+值类型：float
+
+K-b-6：xOffsetRelative（X相对偏移量）
+描述：效果起始时相对于炮塔，抛射体，单位的偏移的方向位置。正数向右，负数向左。
+正确例子：xOffsetRelative:0
+值类型：float
+
+K-b-7：yOffsetRelative（Y相对偏移量）
+描述：效果起始时相对于炮塔，抛射体，单位的偏移的方向位置。正数向前，负数向后。
+正确例子：yOffsetRelative:-25
+值类型：float
+
+K-b-8：xOffsetRelativeRandom（X相对随机偏移量）
+描述：X相对目标随机偏移量。随机增加或减少此值，用于偏移像素。
+正确例子：xOffsetRelativeRandom:1
+值类型：float
+
+K-b-9：yOffsetRelativeRandom（Y相对随机偏移量）
+描述：Y相对目标随机偏移量。随机增加或减少此值，用于偏移像素。
+正确例子：yOffsetRelativeRandom:10
+值类型：float
+
+K-b-10：xOffsetAbsolute（X绝对偏移量）
+描述：Absolute类为绝对偏移，它不像Relative那样考虑单位的方向。比如设置x向速度为1，绝对偏移则始终向右移动，相对偏移可以向任意方向移动。
+正确例子：xOffsetAbsolute:0
+值类型：float
+
+K-b-11：yOffsetAbsolute（Y绝对偏移量）
+描述：按位置偏移起动效果，忽略附加炮塔单位等的方向。
+正确例子：yOffsetAbsolute:10
+值类型：float
+
+K-b-12：xOffsetAbsoluteRandom（X绝对随机偏移量）
+描述：随机增加或减少此值，用于偏移像素。
+正确例子：xOffsetAbsoluteRandom:2
+值类型：float
+
+K-b-13：yOffsetAbsoluteRandom（Y绝对随机偏移量）
+描述：随机增加或减少此值，用于偏移像素。
+正确例子：yOffsetAbsoluteRandom:2
+值类型：float
+
+K-b-14：xSpeedRelative（X相对速度）
+描述：X轴相对于目标的移动速度。，正数向右，负数向左。
+正确例子：xSpeedRelative:1
+值类型：float
+
+K-b-15：ySpeedRelative（Y相对速度）
+描述：Y轴相对于目标的移动速度。正数向前，负数向后。
+正确例子：ySpeedRelative:1
+值类型：float
+
+K-b-16：xSpeedRelativeRandom（X随机相对速度）
+描述：随机增加或减少此值，用于偏移像素。
+正确例子：xSpeedRelativeRandom:0.1
+值类型：float
+
+K-b-17：ySpeedRelativeRandom（Y随机相对速度）
+描述：随机增加或减少此值，用于偏移像素。
+正确例子：ySpeedRelativeRandom:0.1
+值类型：float
+
+K-b-18：xSpeedAbsolute（X绝对速度）
+描述：X轴相对于起点的绝对移动速度。
+正确例子：xSpeedAbsolute:0.1
+值类型：float
+
+K-b-19：ySpeedAbsolute（Y绝对速度）
+描述：Y轴相对于起点的绝对移动速度。
+正确例子：ySpeedAbsolute:0.6
+值类型：float
+
+K-b-20：xSpeedAbsoluteRandom（X随机绝对速度）
+描述：按此值随机更改初始值。
+正确例子：xSpeedAbsoluteRandom:0.1
+值类型：float
+
+K-b-21：ySpeedAbsoluteRandom（Y随机绝对速度）
+描述：按此值随机更改初始值。
+正确例子：ySpeedAbsoluteRandom:0.4
+值类型：float
+
+K-b-22：hOffset（高度偏移）
+描述：距目标的高度偏移。正数向上，负数向下。
+正确例子：hOffset:5
+值类型：float
+
+K-b-23：hOffsetRandom（随机高度偏移）
+描述：按此值随机更改初始值。
+正确例子：hOffsetRandom:3
+值类型：float
+
+K-b-24：hSpeed（高度速度）
+描述：高度移动速度。正数向上，负数向下。
+正确例子：hSpeed:1
+值类型：float
+
+K-b-25：hSpeedRandom（随机高度速度偏移）
+描述：按此值随机更改初始值。
+正确例子：hSpeedRandom:0.1
+值类型：float
+
+K-b-26：dirOffset（角度偏移）
+描述：角度偏移，修改初始朝向。注意,0度可能存在朝向问题。
+正确例子：dirOffset:180
+值类型：float
+
+K-b-27：dirOffsetRandom（随机角度偏移量）
+描述：按此值随机更改偏移角度。
+正确例子：dirOffsetRandom:180
+值类型：float
+
+K-b-28：dirSpeed（转速）
+描述：修改效果的旋转速度。
+正确例子：dirSpeed:5
+值类型：float
+
+K-b-29：dirSpeedRandom（随机转速）
+描述：按此值随机更改旋转速度。
+正确例子：dirSpeedRandom:2
+值类型：float
+
+K-b-30：pivotOffset（枢轴偏移）
+描述：整个效果的朝向偏移
+正确例子：pivotOffset:1.2
+值类型：float
+
+K-b-31：pivotOffsetRandom（枢轴偏移随机）
+描述：按此值随机更改朝向。
+正确例子：pivotOffsetRandom:1.2
+值类型：float
+
+K-c：图形
+
+K-c-1：frameIndex（帧索引）
+描述：使用内置效果时所取用的帧编号，0取第一帧。
+正确例子：frameIndex:1
+值类型：integer
+
+K-c-2：frameIndexRandom（帧随机）
+描述：随机增减索引值，用于随机使用同组内不同的图像。
+正确例子：frameIndexRandom:1
+值类型：integer
+
+K-c-3：stripIndex（图像集）
+描述：要使用的内置图像集。不能与自定义图像一起使用。如effects 效果1对应res内文件effects.png，以此类推。；explode_big爆炸效果图、light_50闪光贴花、flame开火图火焰、dust灰尘贴花、smoke_black黑烟、smoke_white白烟、shockwave冲击波、fire火焰图、lava_bubble岩浆泡、effects2效果2、plasma_shot等离子、shockwave2冲击波2、shockwave_large大冲击波、explode_bits碎片、explode_big2大爆炸、explode_bits_bug虫碎片、projectiles抛射体、projectiles2抛射体2、effects3效果3
+约束：不能与 image 同时使用
+正确例子：stripIndex:shockwave
+值类型：integer/enum
+
+K-c-4：image（图像）
+描述：要使用的自定义图像文件。不能与stripIndex一起使用。
+约束：不能与 stripIndex 同时使用
+正确例子：Image:shibaing.png
+值类型：file
+
+K-c-5：imageShadow（阴影图像）
+描述：用于自定义阴影的图像
+正确例子：imageShadow:SHADOW:shibaing.png
+值类型：file
+
+K-c-6：scaleTo（结束缩放倍数）
+描述：效果结束时缩放倍数。
+正确例子：scaleTo:2
+值类型：float
+
+K-c-7：scaleFrom（初始缩放倍数）
+描述：效果初始时缩放倍数，用于效果从小到大缩放，或者反向缩放。
+正确例子：scaleFrom:0.5
+值类型：float
+
+K-c-8：color（颜色）
+描述：填16进制颜色值，给图像上叠加颜色。一般建议图像使用灰度图，然后叠加颜色。注意彩色图是无法叠加白色变白的。
+正确例子：color:#FFFF0000；color:white
+值类型：color
+
+K-c-9：teamColorRatio（队伍色相）
+描述：填0-1在图像上叠加阵营色，1为完全为阵营色。
+正确例子：teamColorRatio:0.5
+值类型：float
+
+K-c-10：drawType（绘制类型）
+描述：效果的绘制类型
+正确例子：drawType:displacement/normal
+值类型：enum
+
+K-c-11：drawUnderUnits（绘制在单位下方）
+描述：将此效果绘制在单位下方。
+正确例子：drawUnderUnits:true
+值类型：boolean
+
+K-c-12：fadeInTime（淡入时间）
+描述：设置淡入效果时间，从透明到不透明。透明度值从0%到100%。
+正确例子：fadeInTime:15
+值类型：float
+
+K-c-13：fadeOut（淡出）
+描述：设置淡入效果时间，透明度从100%淡出到%0。把alpha设置为高于1可以延长淡出。
+正确例子：fadeOut:true
+值类型：boolean
+
+K-c-14：alpha（不透明度）
+描述：介于0-1之间。可以设置为大于1以延迟淡出效果
+正确例子：alpha:1
+值类型：float
+
+K-c-15：trailEffect（尾焰效果）
+描述：类似于抛射体的尾焰
+正确例子：trailEffect:custom:trails
+值类型：effect(s) code name
+
+K-c-16：trailEffectRate（尾焰效果频率）
+描述：产生频率
+正确例子：trailEffectRate:0
+值类型：float
+
+K-c-17：shadow（阴影）
+描述：true时绘制阴影。如果使用imageShadow则强制为true
+正确例子：shadow:true
+值类型：boolean
+
+K-d：动画
+
+K-d-1：frame_width（单帧宽度）
+描述：规定单帧的宽度像素，如果值小于图像本体宽度则选取帧时采用换列方式进行处理。
+正确例子：frame_width:1000
+值类型：integer
+
+K-d-2：frame_height（单帧高度）
+描述：规定单帧的高度像素，如果值小于图像本体高度则选取帧时采用换行方式进行处理。
+正确例子：frame_height:1000
+值类型：integer
+
+K-d-3：total_frames（动画总帧数）
+描述：动画的总帧数，与图像(image)或frameIndex一起使用。
+正确例子：total_frames:15
+值类型：integer
+
+K-d-4：animateFrameStart（动画开始帧）
+描述：动画从哪一帧开始,第一帧编号为0
+正确例子：animateFrameStart:0
+值类型：integer
+
+K-d-5：animateFrameEnd（动画结束帧）
+描述：动画在哪一帧结束。
+正确例子：animateFrameEnd:14
+值类型：integer
+
+K-d-6：animateFramePingPong（动画帧重放）
+描述：动画正序播放完毕后再倒序播放一次。
+正确例子：animateFramePingPong:true
+值类型：boolean
+
+K-d-7：animateFrameSpeed（动画帧速度）
+描述：动画播放速度，单位位游戏帧，一般动画帧数也不高，所以设置一般为0.x
+正确例子：animateFrameSpeed:0.2
+值类型：time
+
+K-d-8：animateFrameSpeedRandom（动画帧随机速度）
+描述：按此值随机更改动画速度。
+正确例子：animateFrameSpeedRandom0.1
+值类型：time
+
+K-d-9：animateFrameLooping（动画帧循环）
+描述：默认false。当为false时,效果被移除时，动画结束
+正确例子：animateFrameLooping:false
+值类型：boolean
+
+K-d-10：animateFrameStartRandomAdd（动画开始帧随机偏移）
+描述：以动画起始帧为基准，按照+/-所填数字内随机选取数字进行帧随机偏移（似乎无用）
+正确例子：animateFrameStartRandomAdd:10
+值类型：integer
+
+L：动画[animation_NAME]
+L-a：未分类、L-b：关键帧-根据需要创建多个、L-c：多向动画（指单位转到特定角度所播放的动画）、L-d：不建议使用的代码
+
+L-a：未分类
+
+L-a-1：onActions（动画条件）
+描述：动画触发条件：移动、攻击、闲置、在建造中、建造中并将动画拉伸至建造时长、生产中、未知、修复、回收、创建时；move, attack, idle, underConstruction, underConstructionWithLinkedBuiltTime, queuedUnits、Unknown, repair, reclaim, created；多个动作可用逗号分隔。
+正确例子：onActions : Unknown；onActions : queuedUnits
+值类型：enum(s)
+
+L-a-2：onActionsQueuedUnitPlayAt（在队列中有单位播放）
+描述：当使用onAction:queueedUnits时，动画开始之前需要达到值，设置为0-1之间
+正确例子：onActionsQueuedUnitPlayAt :1
+值类型：float
+
+L-a-3：blendIn（融入时间）
+描述：与上一个动画融合时间。
+正确例子：blendIn : time
+值类型：time
+
+L-a-4：blendOut（融出时间）
+描述：与下一个动画融合时间。
+正确例子：blendOut : time
+值类型：time
+
+L-a-5：pingPong（反复播放）
+描述：结束后反向播放动画，它一般用来做生物的呼吸效果。
+正确例子：pingPong:true
+值类型：boolean
+
+L-a-6：playbackRate（重复播放频率）
+描述：重复播放该动画的频率
+正确例子：playbackRate:1
+值类型：integer
+
+L-a-7：KeyframeTimeScale（帧时长缩放）
+描述：缩放所有关键帧时间，这有助于在不更改所有内容的情况下更快/更慢地制作动画
+正确例子：KeyframeTimeScale : float
+值类型：float
+
+L-b：关键帧-根据需要创建多个
+
+L-b-1：arm#_[time]（胳膊关键帧）
+描述：添加一个关键帧。用来创建多个动作的动画。
+正确例子：arm1_5s: {x: 5, dir: 90, y: 20, alpha:0.4, height:50}
+值类型：list
+
+L-b-2：leg#_[time]（腿关键帧）
+描述：添加一个关键帧。用来创建多个动作的动画。
+正确例子：leg1_5s: {x: 5, dir: 90, y: 20, alpha:0.4, height:50}
+值类型：list
+
+L-b-3：body_[time]（主体关键帧）
+描述：随时为主体添加关键帧。身体仅允许使用frame和scale
+正确例子：body_4s: {frame: 4, scale: 0.5}
+值类型：list
+
+L-b-4：effect#_[time]（#处可以为空）（效果关键帧）
+描述：在播放动画时产生效果
+正确例子：eg: effect_2s: {x: 0,y: 5, name: explode}
+值类型：list
+
+L-b-5：turret#_[time]（炮塔关键帧）
+描述：添加一个关键帧。用来创建多个动作的动画。（没有明显效果）
+正确例子：turret1_5s: {x: 5, y: 90 }
+值类型：list
+
+L-c：多向动画（指单位转到特定角度所播放的动画）
+
+L-c-1：direction_useMainTurret（多向动画使用主炮塔）
+描述：覆盖[graphics] animation_direction_useMainTurret，多向动画的执行将以单位主炮塔的角度为基准
+正确例子：direction_useMainTurret:true
+值类型：boolean
+
+L-c-2：direction_units（多向动画度数）
+描述：覆盖[graphics] animation_direction_units，按每多少度切换一次方向帧（如45代表8方向，90代表4方向）。与direction_starting一起决定方向帧起始偏移；当该值小于0时按反向角度取帧。对[action_NAME]内的局部direction_units而言，值为0时此局部覆盖无效，回退到[graphics]的animation_direction_*设置
+正确例子：direction_units:45
+值类型：float
+
+L-c-3：direction_strideX（多向动画x向）
+描述：覆盖[graphics] animation_direction_strideX，动画帧取值在方向改变时偏移。一般填0
+正确例子：direction_strideX:0
+值类型：integer
+
+L-c-4：direction_strideY（多向动画y向）
+描述：覆盖[graphics] animation_direction_strideY，动画帧在方向改变Y轴偏移偏移。与frame_height一起使用。一般填1
+正确例子：direction_strideY:1
+值类型：integer
+
+L-c-5：direction_starting（多向动画朝向）
+描述：覆盖[graphics] animation_direction_starting，第一帧的方向，取决于您的素材。
+正确例子：direction_starting:90
+值类型：float
+
+L-d：不建议使用的代码
+
+L-d-1：start（开始）
+描述：开始图像框。不推荐使用，用于类似此形式的动画。animation_TYPE_pingPong
+正确例子：start:1
+值类型：integer
+
+L-d-2：end（结束）
+描述：结束图像帧。不推荐使用
+正确例子：end:3
+值类型：integer
+
+L-d-3：scale_start（缩放开始）
+描述：开始规模。不推荐使用，而是使用主体关键帧。
+正确例子：scale_start:2
+值类型：float
+
+L-d-4：scale_end（缩放结束）
+描述：最终规模。不推荐使用，而是使用主体关键帧。
+正确例子：scale_end:2
+值类型：float
+
+L-d-5：speed（速度）
+描述：速度越小越快。仅效果开始，结束，scale_start，scale_end
+正确例子：speed:1
+值类型：float
+
+M：行动/隐藏行动[action_NAME] / [hiddenAction_NAME]
+M-a：未分类、M-b：单位参考-从已经存在的单位动态的组成部分、M-c：在UI中显示/ AI的要求、M-d：AI使用方式、M-e：触发器-这些触发器跳过队列并且不使用价格、M-f：当在队列时(准备)时、M-g：杂项结果/结果（发生的情况）、M-h：结果-连锁动作、M-i：结果-声音、M-j：结果-炮塔发射抛射体、M-k：结果-生成单位、M-l：结果-位置、M-m：结果-运输变化、M-n：结果-路径点、M-o：结果-冷却、M-p：结果-动画、M-q：结果-中立、M-r：结果-从其他单位获取资源、M-s：结果-转换资源、M-t：结果-设置资源、M-u：结果-附件(附属、M-v：结果-标签变更、M-w：结果-显示讯息、M-x：结果-发送数据、M-y：结果-设置自定义目标、M-z：单位位置和移动、M-aa：单位统计、M-ab：杂项、M-ac：单位引用、M-ad：标记功能、M-ae：全局功能
+
+M-a：未分类
+
+M-a-1：text（文本）
+描述：界面中显示的文字
+正确例子：text:chemms
+值类型：string
+
+M-a-2：textPostFix（文本后缀）
+描述：显示为后缀的文本，与textAddUnitName一起用于创建文本UI
+正确例子：text: [；textPostFix: ]；textAddUnitName: unitRef self.attachment(slot="${slotId}")
+值类型：string
+
+M-a-3：text_[Language]（文字多语言）
+描述：界面中显示的文字，多语言
+正确例子：text_zh:chemms
+值类型：string
+
+M-a-4：description（描述）
+描述：选中时显示的文本，用于解释其用途。
+正确例子：description:chemms翻译
+值类型：string
+
+M-a-5：description_[Language]（描述）
+描述：描述多语言。
+正确例子：description_en:shibainu
+值类型：string
+
+M-a-6：displayType（显示类型）
+描述：行动的显示类型正常模式为无(绿色)、集结(白色R)、升级(蓝色U)、单位队列（绿色）、建筑(绿色)、行为(蓝色)、仅信息(灰色)、无框信息、仅信息库存（灰色）；none, rally, upgrade, queueUnit, building, action, infoOnly, infoOnlyNoBox,infoOnlyStockpile
+正确例子：displayType:infoOnly
+值类型：string
+
+M-a-7：displayRemainingStockpile（显示剩余库存）
+描述：显示剩余库存,显示为根据资源计算可以触发操作的次数。
+正确例子：displayRemainingStockpile:true
+值类型：boolean
+
+M-a-8：pos（位置）
+描述：此动作在用户界面排序。
+正确例子：pos:0
+值类型：float
+
+M-a-9：iconImage（图标）
+描述：使用图像作为此动作图标。
+正确例子：iconImage:shiba.png
+值类型：file
+
+M-a-10：iconExtraImage（额外图标图像）
+描述：使用图像作为此动作图标。和上一个一致,但显示更靠上。绘制在图标图像上方。对升级图标等有用
+正确例子：iconExtraImage:shibaUPD.png
+值类型：file
+
+M-a-11：iconExtraColor（额外图标颜色）
+描述：将图标叠加上额外的颜色。默认为#64FFFFFF
+正确例子：iconExtraColor:#FFAAAAAA；iconExtraColor:white
+值类型：color
+
+M-a-12：iconExtraIsVisible（额外图标显示条件）
+描述：设置图标什么时候可显示。
+正确例子：iconExtraIsVisible:if self.hasFlag(id=${slotid})
+值类型：Logicbooleanean
+
+M-a-13：unitShownInUI（UI中显示的单位）
+描述：使用此单位作为动作图标。
+正确例子：unitShownInUI: unitRef self.transporting(slot=0)；unitShownInUI:shibainu
+值类型：unit name/unit ref
+
+M-a-14：setBuilt（设置完成度）
+描述：默认为1。填0-1之间的数字，将指定单位建造完成度。比如填0.5，执行完操作后单位自身建造完成度就成了50%
+正确例子：setBuilt:1
+值类型：float
+
+M-a-15：guiBuildUnit（界面显示单位）
+描述：将action图标和鼠标指针改为指定单位，这就像您用建造者去造建筑，会受地形影响，可为action或路径点提供坐标。
+正确例子：guiBuildUnit:turret_artillery
+值类型：unit name
+
+M-a-16：tags（标签）
+描述：(在使用队列大小时可以用withActionTag=x来获取数量)；Used with queueSize(withActionTag=x) and queueItemAdded(withActionTag=x)
+正确例子：tags:customTag1,customTag2
+值类型：string(s)
+
+M-a-17：id（编号）
+描述：允许在单位之间转换时更容易的连接动作（action的id，应该有对应的引用词）
+约束：长度不能超过 15 个字符；不能包含空格以及这些字符：, ( : ；
+正确例子：id:1
+错误例子：id:gdhkdiohdohdhdsksdohohvh；id:123:456(789,000；id:hello world
+值类型：string
+
+M-a-18：aiTags（AI的标签）
+描述：随便填一个得了(专门给AI用的)
+正确例子：aiTags:doge
+值类型：string(s)
+
+M-b：单位参考-从已经存在的单位动态的组成部分
+分类说明：有用的/也可以被敌人看到 self, self.parent(), self.transporting(slot=S), self.attachment(slot=S)
+
+M-b-1：textAddUnitName（从单元添加名称）
+描述：从指定单位添加名称。
+正确例子：textAddUnitName:${section.convertTo}
+值类型：unit name/unit ref
+
+M-b-2：descriptionAddFromUnit（从单元添加描述）
+描述：从指定单位添加单位描述。
+正确例子：descriptionAddFromUnit:unitRef self.attachment(slot="unitSlot${slotId}")
+值类型：unit name/unit ref
+
+M-b-3：descriptionAddUnitStats（从单元添加属性）
+描述：从指定单位添加详细信息描述，比如攻击力，攻击范围。
+正确例子：descriptionAddUnitStats:unitRef self.attachment(slot="unitSlot${slotId}")
+值类型：unit name/unit ref
+
+M-b-4：unitShownInUIWithHpBar（单元在UI显示Hp条）
+描述：在ui中显示单位血条。默认true,仅当unitShownInUI是unitRef时使用
+正确例子：unitShownInUIWithHpBar:true
+值类型：boolean
+
+M-b-5：unitShownInUIWithProgressBar（单元在UI显示进度条）
+描述：在ui中显示单位进度条。默认true,仅当unitShownInUI是unitRef时使用。如果激活，则替换HP bar
+正确例子：unitShownInUIWithProgressBar:true
+值类型：boolean
+
+M-c：在UI中显示/ AI的要求
+
+M-c-1：price（价格）
+描述：此行为需要的价格，可以是多种资源或自定义资源。如果不满足则行为不可用。如果没设定资源类型则默认为资金。如果价格为0，AI可能很少甚至不会使用。
+正确例子：price: credits=5, energy=5, hp=100, shield=5, ammo=1
+值类型：price(s)
+
+M-c-2：isActive（可用）
+描述：默认为true。如果为false，则会禁用操作，并在用户界面中以红色显示。
+正确例子：isActive:true
+值类型：Logicbooleanean
+
+M-c-3：isVisible（可见）
+描述：默认为true。如果false则从UI中隐藏并被禁用。
+约束：在 [hiddenAction] 中不可用
+正确例子：isVisible:true
+值类型：Logicbooleanean
+
+M-c-4：isLocked（锁定）
+描述：默认为false。如果true则禁用操作，则会显示一个锁定文本。可用作禁核或者科技树，或是条件限制。
+正确例子：isLocked:true
+值类型：Logicbooleanean
+
+M-c-5：isLockedMessage（锁定消息）
+描述：显示锁定的原因。
+正确例子：isLockedMessage:您不够可爱
+值类型：string
+
+M-c-6：isLockedAlt（更多锁定）
+描述：另一个原因被锁定。用于显示不同的消息。
+正确例子：isLockedAlt:if not self.isFlying()
+值类型：Logicbooleanean
+
+M-c-7：isLockedAltMessage（更多锁定消息）
+描述：显示更多锁定的原因。
+正确例子：isLockedAltMessage:上天才给您施展。
+值类型：string
+
+M-c-8：isLockedAlt2（更多锁定2）
+描述：另一个原因被锁定。用于显示更多锁定的原因。
+正确例子：isLockedAlt2:if self.isInWater()
+值类型：Logicbooleanean
+
+M-c-9：isLockedAlt2Message（更多锁定消息2）
+描述：显示更多锁定的原因。
+正确例子：isLockedAlt2Message:水中自然要划水了~
+值类型：string
+
+M-c-10：allowMultipleInQueue（允许多个队列）
+描述：允许多次点击此行为形成队列，false时则只能点一次，不能累加。
+正确例子：allowMultipleInQueue:true
+值类型：boolean
+
+M-c-11：onlyOneUnitAtATime（一次只有一个单位）
+描述：填true时选中多个同类单位时，只有一个执行此行为。
+正确例子：onlyOneUnitAtATime:true
+值类型：boolean
+
+M-c-12：isGuiBlinking（界面闪烁）
+描述：此行为在界面中闪烁。
+正确例子：isGuiBlinking:true
+值类型：Logicbooleanean
+
+M-c-13：alwaysSinglePress（总是按一次）
+描述：点击就执行，不需要确认。默认false,不需要在手机上确认，使用canPlayerCancel: false和allowMultipleInQueue: false也隐藏队列接口。
+正确例子：alwaysSinglePress
+值类型：boolean
+
+M-c-14：isAlsoViewableByAllies（显示给盟友）
+描述：允许盟友玩家看到这个单位的动作，对显示其他玩家有用(例如导抛射体数量，收集的物品)
+正确例子：isAlsoViewableByAllies:false
+值类型：boolean
+
+M-c-15：isAlsoViewableByEnemies（显示给敌人）
+描述：允许敌方玩家看到这个单位的动作，对显示其他玩家有用(例如导抛射体数量，收集的物品)
+正确例子：isAlsoViewableByEnemies:false
+值类型：boolean
+
+M-c-16：extraLagHidingInUI（消除ui额外延迟）
+描述：用于联机，在UI中立即更新而不需要从服务器确认的等待时间。
+正确例子：extraLagHidingInUI:true
+值类型：boolean
+
+M-c-17：streamingCost（流式造价）
+描述：就像价格，但在建造时逐渐消耗资金，如果在构建过程中资源耗尽，建造或生产队列将暂停。就像是红警中那样。铁锈默认是预先扣除资金。
+正确例子：streamingCost:100
+值类型：price(s)
+
+M-c-18：switchPriceWithStreamingCost（切换价格为流造价）
+描述：快捷设置为默认资金消耗方式或为流式建造方式。建议使用模板快速将一个模组为所有单位切换流资源。
+正确例子：switchPriceWithStreamingCost:true
+值类型：boolean
+
+M-c-19：aiUse（AI对该行动的使用方式）
+描述：可填：auto(自动)，launch（发射），launchAmmo（发射弹药），disabled（残缺），upGrade(升级)，movementChange(运动改变)，sameAsBuilding（与建筑物相同）
+正确例子：aiUse:launch
+值类型：enum
+
+M-d：AI使用方式
+
+M-d-1：ai_isDisabled（AI被禁用）
+描述：默认为false。使用此操作停止AI使用此动作。
+正确例子：ai_isDisabled:true
+值类型：Logicbooleanean
+
+M-d-2：ai_isHighPriority（AI高优先级）
+描述：AI将优先执行此动作。
+正确例子：ai_isHighPriority:true
+值类型：Logicbooleanean
+
+M-d-3：ai_considerSameAsBuilding（AI作为建筑）
+描述：填建筑。考虑动作的优先级将会跟建筑物建优先级一样。
+正确例子：ai_considerSameAsBuilding:BU_cq
+值类型：unit name
+
+M-e：触发器-这些触发器跳过队列并且不使用价格
+分类说明：忽略isLocked，buildTime等
+
+M-e-1：autoTriggerOnEvent（自动触发事件）
+描述：满足此条件则自动触发。参数表：；创建，完成且激活，销毁，杀死任何单位，队列中单位完成，队列添加项目，队列项目取消，传送，接触目标成功，玩家指定路径，队伍变更，运输新单位，卸载或移除单位，受到伤害[支持可选的(withTag=x)]，进入载具，离开载具，新消息（withTag=x），移除附属，无；created, completeAndActive, destroyed, killedAnyUnit, queuedUnitFinished, queueItemAdded(1,15p9中添加了withActionTag和queueItemCancelled两个参数,用于触发动作时检测标签.), queueItemCancelled, teleported, touchTargetSuccess, newWaypointGivenByPlayer, teamChanged, transportingNewUnit，transportUnloadedOrRemovedUnit，tookDamage[支持可选的(withTag=x)],enteredTransport,leftTransport,newMessage(withTag=x),attachmentRemoved，NONE；多个事件可使用逗号分隔。
+正确例子：autoTriggerOnEvent:destroyed
+值类型：enum(s)
+
+M-e-2：alsoTriggerOrQueueActionWithTarget（也可以使用单位参考触发或队列操作）
+描述：更改其他触发动作的目标，默认为当前动作的目标。影响诸如 fireTurretXAtGround、spawnUnits、thisActionTarget()等。
+正确例子：alsoTriggerOrQueueActionWithTarget:nearestUnit()
+值类型：unit ref
+
+M-e-3：autoTriggerOnEventRecursionLimit（自动触发事件递归限制(默认为1)）
+描述：自己触发自己的限制次数，默认为1
+正确例子：autoTriggerOnEventRecursionLimit:1
+值类型：integer
+
+M-e-4：autoTrigger（自动触发）
+描述：如果为true，则立即触发此操作的效果（忽略价格，isActive，isVisible，buildSpeed等）
+正确例子：autoTrigger: if self.overWater()
+值类型：Logicbooleanean
+
+M-e-5：autoTriggerCheckRate（自动触发检查率）
+描述：选项:everyFrame(默认)，every4Frames, every8Frames。；注意:所有触发器无论检查率都是在第一次创建和自动触发冷却之后检查的。；注:使用模板添加[core]autoTriggerCheckRate:every8Frames到所有单位。可以使使用了复杂autoTriggers的mod有巨大的性能提升。
+正确例子：autoTriggerCheckRate:everyFrame
+值类型：enum
+
+M-f：当在队列时(准备)时
+
+M-f-1：buildSpeed（建造速度）
+描述：建造此动作所需要的时间，这个读条过程下面称之为准备以区分建造，机翻或是多个动作称之为队列。完成时的效果称为结果。
+正确例子：buildSpeed:1s
+值类型：time
+
+M-f-2：buildSpeed_ignoreFactorySpeedModifiers（建造速度忽略工厂乘数）
+描述：建造此动作所需要的时间忽略[core]的工厂速度乘数以及工厂倍数
+正确例子：buildSpeed_ignoreFactorySpeedModifiers:true
+值类型：boolean
+
+M-f-3：refundAllQueuedItems（取消所有队列项目）
+描述：清除所有排队项目并返还资源
+正确例子：refundAllQueuedItems:true
+值类型：boolean
+
+M-f-4：removeAllQueuedItemsWithoutRefund（移除所有未建造完成的队列项目）
+描述：清除所有排队项目但不返还资源
+正确例子：removeAllQueuedItemsWithoutRefund:true
+值类型：boolean
+
+M-f-5：highPriorityQueue（高优先级队列）
+描述：默认为false。如果为true，则此操作将跳过队列中的所有其他低优先级操作。适用于fireTurret类动作。
+正确例子：highPriorityQueue:true
+值类型：boolean
+
+M-f-6：canPlayerCancel（玩家可以取消）
+描述：玩家可以取消此动作。
+正确例子：canPlayerCancel:true
+值类型：boolean
+
+M-f-7：whenBuilding_cannotMove（建造时无法移动）
+描述：执行操作准备时停止单位移动。适用于类似部署类动作。
+正确例子：whenBuilding_cannotMove:true
+值类型：boolean
+
+M-f-8：whenBuilding_playAnimation（建造时播放动画）
+描述：准备此动作时，播放[animation]中自定义的动画。
+正确例子：whenBuilding_playAnimation:AM_shiba
+值类型：animation(s) code name
+
+M-f-9：whenBuilding_rotateTo（建造时旋转）
+描述：准备此动作时，将单位主体旋转到该方向
+正确例子：whenBuilding_rotateTo:-180
+值类型：float
+
+M-f-10：whenBuilding_rotateTo_orBackwards（建造时旋转或反转）
+描述：如果为true，则当角度较小时，允许从whenBuilding_rotateTo旋转180度。
+正确例子：whenBuilding_rotateTo_orBackwards:true
+值类型：boolean
+
+M-f-11：whenBuilding_rotateTo_waitTillRotated（建造时需等待旋转完成）
+描述：暂停准备的行为，直到旋转完成再继续。
+正确例子：whenBuilding_rotateTo_waitTillRotated:true
+值类型：boolean
+
+M-f-12：whenBuilding_temporarilyConvertTo（建造时临时转换为）
+描述：准备此操作时临时转换为另一个单位。原始单位的操作将保留。
+正确例子：whenBuilding_temporarilyConvertTo:TEM_shiba
+值类型：unit ref
+
+M-f-13：whenBuilding_temporarilyConvertTo_keepFields（建造时保留字段）
+描述：不要在使用whenbuilding_temporaryconvertto时更改这些字段(无论是从或到)，这对setUnitStats很有用
+正确例子：whenBuilding_temporarilyConvertTo_keepFields:maxHp
+值类型：enum(s)
+
+M-f-14：whenBuilding_triggerAction（建造时触发动作）
+描述：准备时触发另一个动作
+正确例子：whenBuilding_triggerAction:ACT_shiba
+值类型：(hidden) action(s) code name
+
+M-f-15：whenBuilding_rotateTo_aimAtActionTarget（建造时转向直至瞄准目标）
+描述：准备时转向瞄准目标,luke:测试版注意:在某些情况下是坏的
+正确例子：whenBuilding_rotateTo_aimAtActionTarget:true
+值类型：boolean
+
+M-f-16：whenBuilding_rotateTo_rotateTurretX（建造时转向指定炮塔）
+描述：准备此操作时转向指定炮塔。
+正确例子：whenBuilding_rotateTo_rotateTurretX:shi
+值类型：turret code name
+
+M-f-17：spawnEffectsOnQueue（队列产生效果）
+描述：动作准备开始时产生的效果。
+正确例子：spawnEffectsOnQueue:custom:shiba
+值类型：effect(s) code name
+
+M-f-18：playSoundToPlayerOnQueue（队列播放声音）
+描述：动作准备时播放给玩家的声音。
+正确例子：playSoundToPlayerOnQueue:shiba.ogg
+值类型：file(s)
+
+M-g：杂项结果/结果（发生的情况）
+分类说明：（注意：要显示的动作必须至少有一项结果，或者有isVisible:true）
+
+M-g-1：requireConditional（需要条件）
+描述：如果结果为false，则跳过此操作所有结果。
+正确例子：requireConditional:if not numberOfUnitsInTeam(withTag='shiba',withinRange=233,greaterThan=0)
+值类型：Logicbooleanean
+
+M-g-2：convertTo（转换成）
+描述：将您的单位转换为另一个单位。许多属性被保留。
+正确例子：convertTo:SC_shiba
+值类型：unit name
+
+M-g-3：convertTo_keepCurrentTags（转换时保留标签）
+描述：将单位转换为另一个单位。并且保留拥有的标签。
+正确例子：convertTo_keepCurrentTags:true
+值类型：boolean
+
+M-g-4：convertTo_keepCurrentFields（转换时保留字段）
+描述：转换时不要更改这些字段，这在setUnitStats中很有用
+正确例子：convertTo_keepCurrentFields:maxHp
+值类型：enum(s)
+
+M-g-5：addEnergy（增加能量）
+描述：为单位增加能量。需要设置了energyMax，否则不起作用。（与addResources相同：energy = X）
+正确例子：addEnergy:1
+值类型：float
+
+M-g-6：addResources（添加资源）
+描述：操作完成后，添加这些资源。
+正确例子：addResources: credits=5, energy=-5, hp=-100, shield=5, ammo=1
+值类型：(global) resource code name setting(s)
+
+M-g-7：addResourcesScaledByAIHandicaps（根据AI难度添加资源）
+描述：与addResources类似，但根据AI难度级别增加或减少。比例：最简单40%、简单70%、中等100%、困难140%、很困难180%、不可能370%
+正确例子：addResourcesScaledByAIHandicaps:true/[resource]
+值类型：boolean/(global) resource(s) code name
+
+M-g-8：addResourcesWithLogic（用逻辑添加资源）
+描述：与addResources类似，但允许对资源值使用逻辑
+正确例子：addResourcesWithLogic: hp = select( self.parent.energy>5, 10, 20 )
+值类型：(global) resource code name setting(s)
+
+M-g-9：setResourcesWithLogic（用逻辑设置资源）
+描述：将目标资源设置为此值，而不是添加。小心对全局资源使用。
+正确例子：setResourcesWithLogic: hp=self.parent.hp - 10, energy = self.energy / 2
+值类型：(global) resource code name setting(s)
+
+M-g-10：deleteSelf（删除自身）
+描述：删除执行此操作的单位，没有死亡效果，不执行死亡触发。
+正确例子：deleteSelf:true
+值类型：boolean
+
+M-g-11：resetCustomTimer（重置自定义计时器）
+描述：重置自定义计时器，与self.customTimer()
+正确例子：resetCustomTimer:if self.customTimer(laterThanSeconds=5)
+值类型：Logicbooleanean
+
+M-g-12：setBodyRotation（设置躯干旋转）
+描述：设置单位旋转度数。单位朝右为0度。因为是结果而不是准备过程，所以很突然。（支持动态数字比如memory）
+正确例子：setBodyRotation:memory.dir
+值类型：LogicNumber
+
+M-g-13：setHeight（设置高度）
+描述：新增设置高度，可以使用逻辑
+正确例子：setHeight:self.hp
+值类型：LogicNumber
+
+M-g-14：setUnitStats（设置单位状态）
+描述：字段值。允许在不转换的情况下动态更改选定的字段数量。支持=/+=/-=，动态数学/逻辑。可以改变的领域:maxHp(血量上限)，hp(血量)，selfRegenRate(自身回血速度)，maxShield(护盾上限)，shield(护盾)，shieldRegen(护盾恢复速度)，maxEnergy(能量上限)，energy(能量)，armour(装甲)，mass(质量)，shootDelayMultiplier(开火间隔倍数)，shootDamageMultiplier(开火伤害倍数)，movespeed(最大移动速度)，maxTurnSpeed(最大转弯速度)，maxAttackRange(最大攻击距离)，nanoRange(修复范围)，fogOfWarSightRange(迷雾视野)，nanoFactorySpeed(工厂制造速度倍数)，targetHeight(单位最终高度)
+正确例子：setUnitStats: maxHp+=self.energy+100, hp+=50, shieldRegen=0.5
+值类型：enum setting(s)
+
+M-g-15：resetUnitStats（重置单位状态）
+描述：将setUnitStats所做的更改重置为基本值
+正确例子：resetUnitStats:true
+值类型：boolean
+
+M-g-16：shrinkArrays（简化数组）
+描述：去掉null项或死亡单位项还有为零的项，然后向前压缩
+正确例子：shrinkArrays:arrays
+值类型：array memory name(s)
+
+M-g-17：setUnitMemory（设置单位内存）
+描述：键值对。改变此单位的内存，值可以用逻辑设定。内存必须先用 defineUnitMemory 或 @memory 定义。；注：设置内存时需要加上数组下标，且数组下标从 0 开始。；例如：setUnitMemory: numArray[0]=2
+正确例子：setUnitMemory: """；customText=memory.customText+'hello',；nukeActive=true,；nextTarget=self.attacking.nearestUnit(withinRange=300, withTag='x', relation='enemy')；"""
+值类型：memory setting(s)
+
+M-h：结果-连锁动作
+
+M-h-1：alsoTriggerAction（也执行动作）
+描述：触发其他动作的结果。忽略行动的要求。
+正确例子：alsoTriggerAction: addCredits, playSound
+值类型：action(s) code name
+
+M-h-2：alsoTriggerActionRepeat（重复"也触发行动(alsoTriggerAction)"调用）
+描述：logic number (Repeats the alsoTriggerAction call, index changed on each repeat) - Useful to create loops or work with arrays；（动态数字）（每次重复时改变索引 用于创建循环或处理数组）
+正确例子：alsoTriggerActionRepeat:self.hp
+值类型：logicNumber
+
+M-h-3：alsoQueueAction（也添加进队列）
+描述：将另一个动作添加到序列中。忽略行动的要求
+正确例子：alsoQueueAction
+值类型：action(s) code name
+
+M-h-4：alsoTriggerOrQueueActionConditional（也执行队列或需执行条件）
+描述：将此操作添加到序列。如果条件不满足(false)则忽略alsoQueueAction。默认true.
+正确例子：alsoTriggerOrQueueActionConditional:if not self.isFlying()
+值类型：Logicbooleanean
+
+M-i：结果-声音
+
+M-i-1：playSoundAtUnit（播放声音至单位）
+描述：动作结束时在当前位置播放声音。
+正确例子：playSoundAtUnit:shiba.ogg
+值类型：file(s)
+
+M-i-2：playSoundGlobally（播放声音至全图）
+描述：播放全局声音，所有玩家都能听到。
+正确例子：playSoundGlobally:shiba.ogg:0.5
+值类型：file(s)
+
+M-i-3：playSoundToPlayer（播放声音至玩家）
+描述：播放声音，只有自己能听到。
+正确例子：playSoundToPlayer:shiba.ogg:999
+值类型：file(s)
+
+M-j：结果-炮塔发射抛射体
+
+M-j-1：fireTurretXAtGround（指定攻击地面炮塔）
+描述：使用此炮塔攻击玩家所指定的地面。
+正确例子：fireTurretXAtGround: nukeSilo
+值类型：turret code name
+
+M-j-2：fireTurretXAtGround_withOffset（指定攻击地面坐标）
+描述：攻击指定坐标所在地面，不需要手动选择，
+正确例子：fireTurretXAtGround_withOffset: 0,0
+值类型：integer(s)
+
+M-j-3：fireTurretXAtGround_withProjectile（指定攻击地面抛射体）
+描述：设定使用的抛射体，如果不设置则为炮塔默认的抛射体。
+正确例子：fireTurretXAtGround_withProjectile:PRO_1
+值类型：projectile code name
+
+M-j-4：fireTurretXAtGround_showGuideDecals（指定攻击地面时显示贴花）
+描述：当选择发射位置时显示贴花(参考核抛射体选择发射地点时长按显示)
+正确例子：fireTurretXAtGround_showGuideDecals:guide
+值类型：decal code name
+
+M-j-5：fireTurretXAtGround_withTarget（指定攻击目标）
+描述：炮塔瞄准指示的单位或标记的位置发射
+正确例子：fireTurretXAtGround_withTarget:self.lastDamagedBy
+值类型：unit ref
+
+M-j-6：fireTurretXAtGround_count（指定攻击地面数量）
+描述：设置发射的抛射体数量，默认为1
+正确例子：fireTurretXAtGround_count:9
+值类型：integer
+
+M-j-7：fireTurretXAtGround_onlyOverPassableTileOf（指定攻击地面类型）
+描述：设置手动选择的地面需要满足这种运动方式。列表：无，陆地，建筑，空军，水。两栖，跨悬崖，跨悬崖和度水。；NONE LAND BUILDING AIR WATER HOVER OVER_CLIFF OVER_CLIFF_WATER
+正确例子：fireTurretXAtGround_onlyOverPassableTileOf:LAND
+值类型：enum
+
+M-k：结果-生成单位
+
+M-k-1：spawnUnits（产生单位）
+描述：产生指定单位，可用是多种。
+正确例子：eg: spawnUnits: heavyTank, tank*5, hoverTank(offsetX=10)
+值类型：unit name(s)
+
+M-k-2：spawnEffects（产生效果）
+描述：产生指定效果
+正确例子：spawnEffects:custom:shiba
+值类型：effect(s) code name
+
+M-k-3：produceUnits（生产单位）
+描述：类似spawnUnits，但是单位像正常生产一样，并获得路径的移动。1.13只对非建筑物生成的单位有效。
+正确例子：produceUnits:bigshibainu
+值类型：unit name(s)
+
+M-l：结果-位置
+
+M-l-1：offsetSelfAbsolute（自身位置偏移）
+描述：使用时将修改单位当前位置，以单位为中心的绝对坐标。
+正确例子：offsetSelfAbsolute: 0, 0, 40 [x,y,height]
+值类型：integers
+
+M-l-2：teleportTo（传送到）
+描述：传送到(填单位参考)
+正确例子：teleportTo:nearestUnit
+值类型：unit ref
+
+M-m：结果-运输变化
+
+M-m-1：transportTargetNow（主动装运目标）
+描述：主动装运目标(填单位参考)（luke考虑在1.16p1及以后版本删除该代码）
+正确例子：transportTargetNow:nearestUnit
+值类型：unit ref
+
+M-m-2：addUnitsIntoTransport（添加单位到载具）
+描述：将单位添加到运输槽中，在添加之前会检查空间是否够。
+正确例子：addUnitsIntoTransport: tank*3, heavyTank
+值类型：unit name(s)
+
+M-m-3：deleteNumUnitsFromTransport（从载具中删除单位数）
+描述：从载具中删除指定数量单位。
+正确例子：deleteNumUnitsFromTransport:3
+值类型：integer
+
+M-m-4：deleteNumUnitsFromTransport_onlyWithTags（从载具删除带标签单位）
+描述：从载具中删除具有此标签的指定数量单位。
+正确例子：deleteNumUnitsFromTransport_onlyWithTags:cat
+值类型：string(s)
+
+M-m-5：startUnloadingTransport（开始卸载单位）
+描述：开始卸载单位
+正确例子：startUnloadingTransport:true
+值类型：boolean
+
+M-m-6：forceUnloadTransportNow（强制卸载单位）
+描述：立即强制卸载单位
+正确例子：forceUnloadTransportNow:true
+值类型：boolean
+
+M-m-7：forceUnloadTransportNow_onlyOnSlot（强制卸载指定槽位单位）
+描述：强制卸载指定槽位单位
+正确例子：forceUnloadTransportNow_onlyOnSlot:1
+值类型：integer
+
+M-n：结果-路径点
+
+M-n-1：clearAllWaypoints（清除所有路径点）
+描述：清除当前所有路径。
+正确例子：clearAllWaypoints:true
+值类型：boolean
+
+M-n-2：clearActiveWaypoint（清除当前路径点）
+描述：清除当前路径，也就是停止当前动作，执行下一个路径点。
+正确例子：clearActiveWaypoint:true
+值类型：boolean
+
+M-n-3：addWaypoint_type（添加路径点类型）
+描述：添加的路径点类型。值列表：移动，移动攻击，防守，进入载具，主动装载，攻击，回收，维修，靠近目标，建造，跟随，设置被动目标，卸载至，巡逻，防守至，触发行动，在范围内时触发行动；move, attackMove, guard, loadInto, loadUp, attack, reclaim, repair, touchTarget, build, follow，setPassiveTarget，unloadAt，patrol，guardAt，triggerAction，triggerActionWhenInRange
+正确例子：addWaypoint_type:move
+值类型：enum
+
+M-n-4：addWaypoint_unitType（添加路径点所建造的单位类型）
+描述：用于让当前单位去建造指定单位。仅用于addWaypoint_type:build
+正确例子：addWaypoint_unitType:BU_shiba
+值类型：unit name
+
+M-n-5：addWaypoint_prepend（添加路径点序列位置）
+描述：添加到路径点的开头或结尾
+正确例子：addWaypoint_prepend:true
+值类型：boolean
+
+M-n-6：addWaypoint_triggerActionIfFailed（添加路径点失败触发）
+描述：如果target_nearestUnit找不到匹配项，因此无法添加路径点，则触发此操作
+正确例子：addWaypoint_triggerActionIfFailed:act_fail
+值类型：(hidden) action(s) code name
+
+M-n-7：addWaypoint_triggerActionIfMatched（添加路径点匹配触发）
+描述：如果操作添加的路径点是有效的，则执行指定操作。
+正确例子：addWaypoint_triggerActionIfMatched:act_suc
+值类型：(hidden) action(s) code name
+
+M-n-8：addWaypoint_maxTime（添加路径点检索时间）
+描述：如果此路径点这么久还无法执行完成，则取消。
+正确例子：addWaypoint_maxTime:10s
+值类型：time
+
+M-n-9：addWaypoint_target_nearestUnit_tagged（添加路径点检索标签）
+描述：添加的路径点目标为靠近有此标签的单位。
+正确例子：addWaypoint_target_nearestUnit_tagged:tag_shiba
+值类型：string(s)
+
+M-n-10：addWaypoint_target_nearestUnit_team（添加路径点靠近队伍）
+描述：添加的路径点目标需要的所属方：己方|除自己外任何|中立|除自己外盟友|盟友|敌人|任何，own|notOwn|neutral|allyNotOwn|ally|enemy|any
+正确例子：addWaypoint_target_nearestUnit_team:own
+值类型：enum
+
+M-n-11：addWaypoint_target_nearestUnit_maxRange（添加路径点检索范围）
+描述：添加的路径点靠近某目标时考虑的最大范围。
+正确例子：addWaypoint_target_nearestUnit_maxRange:999
+值类型：float
+
+M-n-12：addWaypoint_target_mapMustBeReachable（添加路径点路径可达）
+描述：添加的路径点靠近某目标时必须是有可到达路径的。
+正确例子：addWaypoint_target_mapMustBeReachable:true
+值类型：boolean
+
+M-n-13：addWaypoint_target_fromReference（添加路径点来自参考）
+描述：添加路径点来自单位信息引用。
+正确例子：addWaypoint_target_fromReference: memory.lastDock
+值类型：unit ref
+
+M-n-14：addWaypoint_position_offsetFromSelf（添加路径点坐标偏移）
+描述：添加的路径点相对于自身偏移的坐标。
+正确例子：addWaypoint_position_offsetFromSelf:10,10
+值类型：integer(s)
+
+M-n-15：addWaypoint_position_fromAction（添加路径点动作坐标）
+描述：将当前动作指定的坐标添加进路径序列中。
+正确例子：addWaypoint_position_fromAction:true
+值类型：boolean
+
+M-n-16：addWaypoint_position_randomOffsetFromSelf（添加路径点随机偏移）
+描述：添加坐标进路径点时的随机值。
+正确例子：addWaypoint_position_randomOffsetFromSelf:5,5
+值类型：integer(s)
+
+M-n-17：addWaypoint_position_relativeOffsetFromSelf（添加路径点相对偏移）
+描述：添加路径点位置相对自身偏移量。
+正确例子：addWaypoint_position_relativeOffsetFromSelf:10,10
+值类型：integer(s)
+
+M-n-18：addWaypoint_target_randomUnit_tagged（添加指定标签的随机单位）
+描述：添加路径点单位为指定标签的随机单位
+正确例子：addWaypoint_target_randomUnit_tagged:shibaInu
+值类型：unit name
+
+M-n-19：addWaypoint_target_randomUnit_team（添加指定队伍的随机单位）
+描述：添加路径点单位为指定队伍的随机单位
+正确例子：addWaypoint_target_randomUnit_team:own
+值类型：enum
+
+M-n-20：addWaypoint_target_randomUnit_maxRange（添加指定范围的随机单位）
+描述：添加路径点单位为指定范围的随机单位
+正确例子：addWaypoint_target_randomUnit_maxRange:999
+值类型：float
+
+M-o：结果-冷却
+
+M-o-1：addAllActionCooldownsTime（增加所有动作冷却时间）
+描述：增加所有action的冷却时间。
+正确例子：addAllActionCooldownsTime:10s
+值类型：time
+
+M-o-2：addAllActionCooldownsFor（对于所有动作而言增加冷却时间）
+描述：增加所有action的冷却时间。
+正确例子：addAllActionCooldownsFor:10s
+值类型：time
+
+M-o-3：addActionCooldownTime（增加动作冷却时间）
+描述：增加动作冷却时间，制作先充能再使用的action更加容易了。
+正确例子：addActionCooldownTime:10s
+值类型：time
+
+M-o-4：addActionCooldownFor（对于动作而言增加冷却时间）
+描述：增加动作冷却时间，制作先充能再使用的action更加容易了。
+正确例子：addActionCooldownFor:10s
+值类型：time
+
+M-o-5：addActionCooldownApplyToActions（添加指定动作冷却时间）
+描述：action id，设置addActionCooldownTime的目标。默认情况下是当前操作本身。
+正确例子：addActionCooldownApplyToActions:hello
+值类型：(hidden) action(s) code name
+
+M-o-6：clearAllActionCooldowns（清除所有动作冷却时间）
+描述：清除所有动作冷却时间，使其立即可用。
+正确例子：clearAllActionCooldowns:true
+值类型：boolean
+
+M-p：结果-动画
+
+M-p-1：playAnimation（播放动画）
+描述：播放[animation_xx]类型动画。
+正确例子：playAnimation:shiba
+值类型：animation(s) code name
+
+M-p-2：playAnimationIfNotPlaying（如果未播放动画则播放动画）
+描述：如果没有播放该动画，就播放该动画
+正确例子：playAnimationIfNotPlaying:shiba
+值类型：animation(s) code name
+
+M-p-3：playAnimation_lowPriority（低优先级播放动画）
+描述：让 playAnimation 或 playAnimationIfNotPlaying 以较低优先级播放，减少打断更高优先级动画的可能。
+正确例子：playAnimation_lowPriority:true
+值类型：boolean
+
+M-p-4：finishPlayingLastAnimation（完成最后一个动画）
+描述：完成最后一个动画，包括融合
+正确例子：finishPlayingLastAnimation:true
+值类型：boolean
+
+M-p-5：stopLastAnimation（停止最后一个动画）
+描述：停止最后一个动画，跳过融合
+正确例子：stopLastAnimation:true
+值类型：boolean
+
+M-q：结果-中立
+
+M-q-1：switchToNeutralTeam（切换至中立队伍）
+描述：将队伍更改为中立。该队伍与其他所有队伍结盟。除非使用[core]stayNeutral:true，否则它将被附近的单位捕获。
+正确例子：switchToNeutralTeam:true
+值类型：boolean
+
+M-q-2：switchToAggressiveTeam（切换至侵略性队伍）
+描述：将此单位队伍更改为侵略性的内置队伍。不能被其它单位捕获。
+正确例子：switchToAggressiveTeam:true
+值类型：boolean
+
+M-q-3：switchToTeam（切换至特定队伍）
+描述：切换到小队id。从0开始。(中立-1，敌对中立-2)
+正确例子：switchtoteam:-1
+值类型：LogicInteger
+
+M-r：结果-从其他单位获取资源
+分类说明：多数代码我并没有实验。
+
+M-r-1：takeResources（提取资源）
+描述：提取资源，至少写一种资源。
+正确例子：takeResources: hp=5, gold=10
+值类型：price(s)
+
+M-r-2：takeResources_includeUnitsInTransport（提取资源包括载具内）
+描述：提取资源，包括载具内单位。
+正确例子：takeResources_includeUnitsInTransport:true
+值类型：boolean
+
+M-r-3：takeResources_includeParent（提取资源包括父单位或载具）
+描述：提取资源，包括父单位和运输载具。
+正确例子：takeResources_includeParent:true
+值类型：boolean
+
+M-r-4：takeResources_includeReference（提取资源包括引用）
+描述：提取资源包括指定单位。
+正确例子：[action]takeResources_includeReference: self.lastDamagedBy
+值类型：unit ref
+
+M-r-5：takeResources_triggerActionForEach（每找到一个提取目标触发行动）
+描述：引用动作(找到带有资源的目标单位并提取时)
+正确例子：takeResources_triggerActionForEach:go
+值类型：(hidden) action(s) code name
+
+M-r-6：takeResources_includeUnitsWithinRange（提取资源范围）
+描述：提取资源，在此范围内。
+正确例子：takeResources_includeUnitsWithinRange:350
+值类型：float
+
+M-r-7：takeResources_includeUnitsWithinRange_team（提取资源队伍）
+描述：提取在此范围内队伍的资源。与“includeUnitsWithinRange”一起使用，默认为own。可以是：；己方|除自己外任何|中立|除自己外盟友|盟友|敌人|任何，own|notOwn|neutral|allyNotOwn|ally|enemy|any
+正确例子：takeResources_includeUnitsWithinRange_team:own
+值类型：enum
+
+M-r-8：takeResources_excludeUnitsWithoutTags（提取资源需要标签）
+描述：提取资源，但只提取有此标签的单位
+正确例子：takeResources_excludeUnitsWithoutTags:TAG_shiba
+值类型：string(s)
+
+M-r-9：takeResources_excludeUnitsWithoutCustomTarget1EqualTo（仅提取自定义目标一为）
+描述：提取资源，但仅提取自定义目标一为此代码所填值的单位
+正确例子：takeResources_excludeUnitsWithoutCustomTarget1EqualTo:self
+值类型：unit ref
+
+M-r-10：takeResources_excludeUnitsWithTheseResources（提取资源排除资源）
+描述：提取资源，不包括拥有这些资源的单位。
+正确例子：takeResources_excludeUnitsWithTheseResources:CP_shiba
+值类型：(global) resource(s) code name
+
+M-r-11：takeResources_excludeUnitsWithoutAllResources（提取资源排除不足）
+描述：提取资源，排除缺乏资源者。默认为true.
+正确例子：takeResources_excludeUnitsWithoutAllResources:true
+值类型：boolean
+
+M-r-12：takeResources_triggerActionIfAnyCollected（提取资源成功触发）
+描述：如果有任何收集，则触发动作。
+正确例子：takeResources_triggerActionIfAnyCollected:ACT_shiba
+值类型：(hidden) action(s) code name
+
+M-r-13：takeResources_triggerActionIfNoneCollected（提取资源失败触发）
+描述：如果没有收集，则触发操作。
+正确例子：takeResources_triggerActionIfNoneCollected:act_shibainu
+值类型：(hidden) action(s) code name
+
+M-r-14：takeResources_discardCollected（提取资源删除）
+描述：从目标中获取资源，但不向自身添加也就是删除。
+正确例子：takeResources_discardCollected:true
+值类型：boolean
+
+M-r-15：takeResources_keepResourcesOnTarget（提取资源克隆）
+描述：不从目标添加或删除资源。但克隆资源。与takeResources_discardCollected和takeResources_triggerActionIfAnyCollected一起使用以创建资源检测器。
+正确例子：takeResources_keepResourcesOnTarget:true
+值类型：boolean
+
+M-r-16：takeResources_maxUnits（提取资源目标量）
+描述：最多从多少单位提取资源，默认为1。
+正确例子：takeResources_maxUnits:1
+值类型：integer
+
+M-r-17：takeResources_directTransferStoppingAtZero（提取资源直接转换至零）
+描述：提取资源直接转换至0,用于完全转换。如果目标上的资源少于转帐金额，则只有剩余的资源将被转帐。不支持使用其他一些takeResources_*代码
+正确例子：takeResources_directTransferStoppingAtZero:true
+值类型：boolean
+
+M-r-18：takeResources_searchOnly（获取资源仅供搜索）
+描述：新增快捷方式，可在此处直接声明以下参数：；takeResources_maxUnits=200；takeResources_discardCollected=true；takeResources_keepResourcesOnTarget=true；注意：填写本代码时，必须至少包含以下代码之一：takeResources_includeUnitsWithinRange:#
+正确例子：takeResources_searchOnly:true
+值类型：boolean
+
+M-r-19：takeResources_saveFirstUnitToCustomTarget1（提取资源保存第一个单元自定义目标1）
+描述：提取资源保存第一个单元一定是自定义目标1
+正确例子：takeResources_saveFirstUnitToCustomTarget1:true
+值类型：boolean
+
+M-r-20：takeResources_saveFirstUnitToCustomTarget2（提取资源保存第一个单元自定义目标2）
+描述：提取资源保存第一个单元一定是自定义目标2
+正确例子：takeResources_saveFirstUnitToCustomTarget2:true
+值类型：boolean
+
+M-s：结果-转换资源
+
+M-s-1：convertResource_from（转换资源来源）
+描述：将此资源转换资源为别的资源。
+正确例子：convertResource_from:SP_cat
+值类型：(global) resource code name
+
+M-s-2：convertResource_to（转换资源至）
+描述：将资源转后为此资源，要提供的自定义资源的名称
+正确例子：convertResource_to:SP_shiba
+值类型：(global) resource code name
+
+M-s-3：convertResource_minAmount（转换资源至少）
+描述：如果来源中资源小于该数量，则跳过。默认为0。在大多数情况下可能不需要。
+正确例子：convertResource_minAmount:0
+值类型：integer
+
+M-s-4：convertResource_maxAmount（转换资源至多）
+描述：“来源资源”和“转换后资源”之间的最大转化量
+正确例子：convertResource_maxAmount:999
+值类型：integer
+
+M-s-5：convertResource_multiplyAmountBy（转换资源倍率）
+描述：资源转换倍率，不影响提取的数量。默认值为1。
+正确例子：convertResource_multiplyAmountBy:0.1
+值类型：float
+
+M-t：结果-设置资源
+
+M-t-1：resourceAmount（资源类型）
+描述：自定义资源的名称，使用以下3个键进行设置。所有键都是可选的，可以一起使用。
+正确例子：resourceAmount:SP_cat
+值类型：(global) resource code name
+
+M-t-2：resourceAmount_setValue（资源类型设置数值）
+描述：设置此资源的绝对值，忽略资源的当前值。默认忽略。
+正确例子：resourceAmount_setValue:99
+值类型：float
+
+M-t-3：resourceAmount_addOtherResource（资源类型添加至）
+描述：添加到其中的另一个自定义资源的名称。可以不使用resourceAmount_setValue，只是添加资源。或者使用resourceAmount_setValue:0复制一个资源值。
+正确例子：resourceAmount_addOtherResource:SP_shiba
+值类型：(global) resource code name
+
+M-t-4：resourceAmount_multiplyBy（资源类型乘数）
+描述：默认值为1。将当前资源值乘上此值。
+正确例子：resourceAmount_multiplyBy:1
+值类型：float
+
+M-u：结果-附件(附属
+分类说明：子单位)更改
+
+M-u-1：attachments_addNewUnits（附属添加单位）
+描述：添加单位作为其子单位，需要定义附属位置。
+正确例子：attachments_addNewUnits:shiba
+值类型：unit name(s)
+
+M-u-2：attachments_deleteNumUnits（附属删除单位数）
+描述：删除单位数量
+正确例子：attachments_deleteNumUnits:1
+值类型：integer
+
+M-u-3：attachments_onlyOnSlots（附属添加于槽位）
+描述：只将附属物添加于特定的槽位
+正确例子：attachments_onlyOnSlots:SL_shiba
+值类型：attachment code name
+
+M-u-4：disconnectFromParent（脱离父单位）
+描述：用于子单位脱离父单位
+正确例子：disconnectFromParent:true
+值类型：boolean
+
+M-u-5：attachments_unload（卸载附属）
+描述：卸载所有附属。可以与attachments_onlyonslot一起使用。与运输单位卸载相同
+正确例子：attachments_unload:true
+值类型：boolean
+
+M-u-6：attachments_disconnect（附属断开连接）
+描述：断开所有现在所在位置的附属。可以与attachments_onlyonslot一起使用。
+正确例子：attachments_disconnect:true
+值类型：boolean
+
+M-v：结果-标签变更
+
+M-v-1：temporarilyAddTags（临时标签添加）
+描述：将标签添加到单位，直到转换或重置。
+正确例子：temporarilyAddTags:TEM_PD_shiba
+值类型：string(s)
+
+M-v-2：temporarilyRemoveTags（临时标签删除）
+描述：从单位上删除标签，直到将其转换或重置。
+正确例子：temporarilyRemoveTags:TEM_PD_shiba
+值类型：string(s)
+
+M-v-3：resetToDefaultTags（标签重置）
+描述：重置为默认标签。
+正确例子：resetToDefaultTags:true
+值类型：boolean
+
+M-v-4：addGlobalTeamTags（添加全局标签）
+描述：为玩家的团队添加此全局标签。与self.globalTeamTags()一起使用可创建解锁和升级。
+正确例子：addGlobalTeamTags:TEM_UP_shiba
+值类型：string(s)
+
+M-v-5：removeGlobalTeamTags（移除全局标签）
+描述：从玩家队伍中删除此全局标签。
+正确例子：removeGlobalTeamTags:TEM_UP_shiba
+值类型：string(s)
+
+M-w：结果-显示讯息
+
+M-w-1：showMessageToPlayer（发送消息至玩家）
+描述：向玩家个人发送信息。自己发给自己。
+正确例子：showMessageToPlayer:对面傻蛋，您看不到！
+值类型：string
+
+M-w-2：showMessageToPlayer_[Language]（发送消息至玩家）
+描述：向玩家个人发送信息。自己发给自己。多语言版。注意:这种格式是支持几乎所有字符串显示给玩家，即使当引用不显示它
+正确例子：showMessageToPlayer_es:text test shiba；showMessageToPlayer_zh:文本测试chemms
+值类型：string
+
+M-w-3：showMessageToAllPlayers（发送消息至所有）
+描述：向所有玩家发送消息。
+正确例子：showMessageToAllPlayers:对面傻猫，队友说是不是？
+值类型：string
+
+M-w-4：showMessageToAllEnemyPlayers（发送消息给所有敌人）
+描述：发送消息给所有敌人。
+正确例子：showMessageToAllEnemyPlayers:我投靠，收不？
+值类型：string
+
+M-w-5：showQuickWarLogToPlayer（发送战争快报至玩家）
+描述：向玩家个人发送战争快报。（在左下角）
+正确例子：showQuickWarLogToPlayer:对面制杖，您看不到。
+值类型：string
+
+M-w-6：showQuickWarLogToAllPlayers（发送战争快报至所有）
+描述：向所有玩家发送战争快报。（在左下角）
+正确例子：showQuickWarLogToAllPlayers:这是单位全局嘲讽。
+值类型：string
+
+M-w-7：debugMessage（调试信息）
+描述：仅在启用调试模式的沙盒模式中显示。
+正确例子：debugMessage:[string]
+值类型：string
+
+M-x：结果-发送数据
+
+M-x-1：sendMessageTo（发送信息至）
+描述：填单位/单位引用
+正确例子：sendMessageTo:self.lastDamagedBy
+值类型：unit ref
+
+M-x-2：sendMessageWithData（发送信息与数据）
+描述：填变量=XXX；发送的是 eventData，相当于临时 memory。
+正确例子：sendMessageWithData:XXX=XXX
+值类型：eventData(s)
+
+M-x-3：sendMessageWithTags（发送标签）
+描述：填指定标签，可用逗号分隔多个标签。
+正确例子：sendMessageWithTags:cheems
+值类型：string(s)
+
+M-y：结果-设置自定义目标
+
+M-y-1：setCustomTarget1（设置自定义目标1）
+描述：建议填单位引用
+正确例子：setCustomTarget1:self
+值类型：unit name/unit ref
+
+M-y-2：setCustomTarget2（设置自定义目标2）
+描述：建议填单位引用
+正确例子：setCustomTarget2:self
+值类型：unit name/unit ref
+
+M-y-3：swapCustomTarget1And2（交换自定义目标1和2）
+描述：填布尔值
+正确例子：swapCustomTarget1And2:true
+值类型：boolean
+
+M-y-4：neutralTeam（中立）
+描述：用于action生成单位，大多数单位的生成键都支持多个单位且带有参数。注意：与spawnUnit不能混用spawnUnit用于抛射体。；生成这个单位归属于中立队伍而不是所属玩家。
+约束：不能与 spawnUnit 混用
+正确例子：spawnUnits:cat(neutralTeam=true)
+值类型：boolean
+
+M-y-5：aggressiveTeam（敌对队伍）
+描述：生成这个单位归属于敌对中立队伍而不是所属玩家。
+正确例子：spawnUnits:cat(aggressiveTeam=true)
+值类型：boolean
+
+M-y-6：setToTeamOfLastAttacker（所属攻击者）
+描述：生成单位归属于攻击者。（在[core] unitsSpawnedOnDeath上有用）
+正确例子：spawnUnits:cat(setToTeamOfLastAttacker=true)
+值类型：boolean
+
+M-y-7：spawnChance（产生几率）
+描述：生成这个单位几率。 默认为1。
+正确例子：spawnUnits:cat(spawnChance=0.5)
+值类型：float
+
+M-y-8：spawnSource（产生源）
+描述：改变产生地点和产生单位的队伍到这个单位参考。
+正确例子：spawnUnits: tank(spawnSource=memory.lastLocation)
+值类型：unit ref
+
+M-y-9：maxSpawnLimit（最大生成数量）
+描述：与spawnChance一起使用时，总共可以产生的最大单位数。
+正确例子：spawnUnits:treeA(spawnChance=0.5, maxSpawnLimit=1)
+值类型：integer
+
+M-y-10：gridAlign（对齐网格）
+描述：将生成位置与网格对齐，对建筑物有用
+正确例子：spawnUnits:cat(gridAlign=true, skipIfOverlapping=true)
+值类型：boolean
+
+M-y-11：skipIfOverlapping（跳过条件）
+描述：如果在无效的位置忽略单位生成。 例如基于LAND的单位不会产生在水中。
+正确例子：spawnUnits:cat(gridAlign=true, skipIfOverlapping=true)
+值类型：boolean
+
+M-y-12：falling（降落）
+描述：让单位在生成时从天而降
+正确例子：spawnUnits:cat(falling=true)
+值类型：boolean
+
+M-y-13：offsetX（X偏移）
+描述：生成单位位置X偏移量，单位像素
+正确例子：spawnUnits:cat(offsetX=10,offsetY=10)
+值类型：float
+
+M-y-14：offsetY（Y偏移）
+描述：生成单位位置Y偏移量
+正确例子：spawnUnits:cat(offsetX=10,offsetY=10)
+值类型：float
+
+M-y-15：offsetRandomX（X随机偏移）
+描述：生成单位位置X随机偏移量
+正确例子：spawnUnits:cat(offsetRandomX=10,offsetRandomY=10)
+值类型：float
+
+M-y-16：offsetRandomY（Y随机偏移）
+描述：生成单位位置Y随机偏移量
+正确例子：spawnUnits:cat(offsetRandomX=10,offsetRandomY=10)
+值类型：float
+
+M-y-17：offsetRandomXY（XY随机偏移）
+描述：生成出的抛射体在两个方向的偏移随机偏移，使真正的在一个区域随机化。
+正确例子：spawnUnits:cat(offsetRandomXY=10)
+值类型：float
+
+M-y-18：offsetRandomDir（角度随机偏移）
+描述：生成单位时角度随机偏移量
+正确例子：spawnUnits:cat(offsetRandomDir=10)
+值类型：float
+
+M-y-19：offsetHeight（高度偏移）
+描述：生成此单位的高度偏移量。
+正确例子：spawnUnits:cat(offsetRandomDir=10)
+值类型：integer
+
+M-y-20：offsetDir（角度偏移）
+描述：生成单位时角度偏移量。单位度。
+正确例子：spawnUnits:cat(offsetHeight=10)
+值类型：float
+
+M-y-21：addResources（增加资源）
+描述：给生成单位这些资源，可用于设置触发动作的标志
+正确例子：spawnUnits:crates(addResources=gold:30|stone:10, spawnChance=0.5)
+值类型：(global) resource code name setting(s)
+
+M-y-22：transportedUnitsToTransfer（转移自身载员至生成载具）
+描述：将指定数量的单元放入生成出的单元的运输槽位中。
+正确例子：spawnUnits:transporter(transportedUnitsToTransfer=5)
+值类型：integer
+
+M-y-23：copyWaypointsFrom（复制路径来自）
+描述：复制目标上的所有路径点到创建的单位。
+正确例子：spawnUnits: tank(copyWaypointsFrom=self)
+值类型：unit ref
+
+M-y-24：alwaysStartDirAtZero（朝向总是为零）
+描述：生成出的单位朝向总是设置为零度。即朝右。
+正确例子：spawnUnits:wolf(alwayStartDirAtZero=true)
+值类型：boolean
+
+M-y-25：alwayStartDirAtZero（朝向总是零度）
+描述：生成出的单位朝向总是设置为零度。即朝右。
+正确例子：spawnUnits:wolf(alwayStartDirAtZero=true)
+值类型：boolean
+
+M-y-26：techLevel（圈大小（科技等级））
+描述：只能给 damagingBorder（伤害边界，也称毒圈，红圈）和zoneMarker（预缩圈，也称白圈）使用的特殊值，填数字，计算方式是数值X地块5格。最小值为0，圈不可见。如填1则半径为5格。
+值类型：integer
+
+M-y-27：spawnChance（产生机会）
+描述：大多数生成抛射体代码可用于抛射体参数。；抛射体产生几率，默认为1；示例：spawnProjectilesOnEndOfLife: secondary*3(spawnChance=0.5)
+正确例子：spawnProjectilesOnCreate:1(spawnChance=0.5)
+值类型：float
+
+M-y-28：maxSpawnLimit（最大产生限制）
+描述：抛射体的最大产生数量
+正确例子：spawnProjectilesOnCreate:1(maxSpawnLimit=4)
+值类型：integer
+
+M-y-29：recursionLimit（递归限制）
+描述：用于限制抛射体生成抛射体自身的上限,而不会产生死循环。这对自动生成很有用，因为不会无限生成，有利于链条爆炸
+正确例子：spawnProjectilesOnCreate:1(recursionLimit=5)
+值类型：integer
+
+M-y-30：offsetX（偏移量x）
+描述：生成出的抛射体的x轴偏移量
+正确例子：spawnProjectilesOnCreate:1(offsetX=10)
+值类型：float
+
+M-y-31：offsetY（偏移量y）
+描述：生成出的抛射体的y轴偏移量
+正确例子：spawnProjectilesOnCreate:1(offsetY=11)
+值类型：float
+
+M-y-32：offsetRandomX（偏移随机X）
+描述：生成出的抛射体的x轴的随机偏移量
+正确例子：spawnProjectilesOnCreate:1(offsetRandomX=12)
+值类型：float
+
+M-y-33：offsetRandomY（偏移随机Y）
+描述：生成出的抛射体的y轴的随机偏移量
+正确例子：spawnProjectilesOnCreate:1(offsetRandomY=13)
+值类型：float
+
+M-y-34：offsetRandomXY（偏移随机XY）
+描述：生成出的抛射体在两个方向的偏移随机偏移，使真正的在一个区域随机化。
+正确例子：spawnProjectilesOnCreate:1(offsetRandomXY=14)
+值类型：float
+
+M-y-35：offsetHeight（偏移高度）
+描述：生成出的抛射体的z轴也就是高度偏移
+正确例子：spawnProjectilesOnCreate:1(offsetHeight=15)
+值类型：float
+
+M-y-36：offsetDir（偏移角度）
+描述：生成出的抛射体的角度偏移
+正确例子：spawnProjectilesOnCreate:1(offsetDir=16)
+值类型：float
+
+M-y-37：offsetRandomDir（偏移随机角度）
+描述：生成出的抛射体的角度随机偏移量
+正确例子：spawnProjectilesOnCreate:1(offsetRandomDir=17)
+值类型：float
+
+M-y-38：xOffsetRelative（x相对偏移）
+描述：生成出的抛射体的x轴的相对偏移量
+正确例子：spawnProjectilesOnCreate:1(xOffsetRelative=19)
+值类型：float
+
+M-y-39：yOffsetRelative（y相对偏移）
+描述：生成出的抛射体的y轴的相对偏移量
+正确例子：spawnProjectilesOnCreate:1(yOffsetRelative=20)
+值类型：float
+
+M-y-40：xOffsetAbsolute（x绝对偏移）
+描述：生成出的抛射体的x轴的绝对偏移量
+正确例子：spawnProjectilesOnCreate:1(xOffsetAbsolute=19)
+值类型：float
+
+M-y-41：yOffsetAbsolute（y绝对偏移）
+描述：生成出的抛射体的y轴的绝对偏移量
+正确例子：spawnProjectilesOnCreate:1(yOffsetAbsolute=20)
+值类型：float
+
+M-y-42：true（是）
+描述：许多参数可以写等于，但luke没有正式写在代码表中；满足/是/对/为真/1，不建议使用1或0，不是所有代码都支持。
+正确例子：autoTrigger:true
+值类型：booleanean
+
+M-y-43：false（非）
+描述：不满足/非/错/假/0
+正确例子：autoTrigger:false
+值类型：booleanean
+
+M-y-44：if（如果）
+描述：所有逻辑布尔值使用if开始，除非仅使用true/false
+正确例子：autoTrigger:if self.hp != 0
+值类型：IfEvent
+
+M-y-45：and（和）
+描述：需要and两边条件都满足执行。
+正确例子：if self.isInWater() and self.energy(greaterThan=1)
+值类型：connect
+
+M-y-46：or（或者）
+描述：or两边条件满足一个即可执行。
+正确例子：if self.energy(greaterThan=1) or self.ammo(greaterThan=1) and self.isFlying()
+值类型：connect
+
+M-y-47：not（非）
+描述：将逻辑结果取反。
+正确例子：if not self.isOverLiquid()
+值类型：connect
+
+M-y-48：<（小于）
+描述：如果左边的数字较小则返回真
+正确例子：autoTrigger:if self.hp < 0
+值类型：boolean
+
+M-y-49：>（大于）
+描述：如果右侧的数字较小则返回真
+正确例子：autoTrigger:if self.hp > 0
+值类型：boolean
+
+M-y-50：<=（小于或等于）
+描述：如果左边的数字小于或等于右边，则返回真
+正确例子：autoTrigger:if self.hp <= 0
+值类型：boolean
+
+M-y-51：>=（大于或等于）
+描述：如果右侧的数字小于或等于右边，则返回真
+正确例子：autoTrigger:if self.hp >= 0
+值类型：boolean
+
+M-y-52：==（等于）
+描述：如果两边的数字、单位、字符串、布尔值相同，则返回真
+正确例子：autoTrigger:if self.hp == 0
+值类型：boolean
+
+M-y-53：!=（不等于）
+描述：如果两边的数字、单位、字符串、布尔值不同，则返回真
+正确例子：autoTrigger:if self.hp != 0
+值类型：boolean
+
+M-y-54：+（加）
+描述：添加两个数字或连接两个字符串（可以在${x}中使用，用法和logic中一样，在此不做例子解释）
+正确例子：autoTrigger:if self.hp + self.shield == 0
+值类型：same type
+
+M-y-55：-（减）
+描述：两个数字相减所得值（可以在${x}中使用，用法和logic中一样，在此不做例子解释）
+正确例子：autoTrigger:if self.hp - self.shield == 0
+值类型：same type
+
+M-y-56：/（除）
+描述：两个数字相除所得值（可以在${x}中使用，用法和logic中一样，在此不做例子解释）
+正确例子：autoTrigger:if self.hp * self.shield == 0
+值类型：same type
+
+M-y-57：*（乘）
+描述：两个数相乘所得值（可以在${x}中使用，用法和logic中一样，在此不做例子解释）
+正确例子：autoTrigger:if self.hp / self.shield == 0
+值类型：same type
+
+M-y-58：%（求余）
+描述：将两个数字相除并取余数部分作为计算所得值（可以在${x}中使用，用法和logic中一样，在此不做例子解释）
+正确例子：autoTrigger:if self.hp % self.shield == 0
+值类型：same type
+
+M-y-59：^（幂运算）
+描述：将后一个数字的值作为前一个数的幂来进行运算（只能在${x}中使用）
+正确例子：price:${a^b}（这里假设我们设置了a是2，b是3，那么这一段则返回8）
+值类型：same type
+
+M-y-60：()（囊括符）
+描述：用于囊括逻辑，可以把诸多逻辑用囊括符囊括成一个逻辑 可以避免像“or”这种衔接字符的烦人问题（可以在${x}中使用，用法和logic中一样，在此不做例子解释）
+正确例子：autoTrigger：if (self.hp(empty=true) and self.energy(full=true)) or (self.energy(empty=true) and self.hp(full=true))
+值类型：include
+
+M-z：单位位置和移动
+
+M-z-1：self.isUnderwater()（自身在水下）
+描述：单位在水下，深水单位如潜艇。
+正确例子：if self.isUnderwater()
+值类型：boolean
+
+M-z-2：self.underwater()（自身在水下）
+描述：同上
+
+M-z-3：self.gound()（自身在地上）
+描述：单位在陆地上
+
+M-z-4：self.ground()（自身在地上）
+描述：同上
+
+M-z-5：self.isAtGroundHeight()（自身在地面高度）
+描述：单位在地面,触发范围是-1~4，如果您单位高度在不断变化时超过此值的话，此条不一定触发，因为铁锈执行频率默认是1s.；等同于self.gound()或self.ground()
+正确例子：if self.isAtGroundHeight()
+值类型：boolean
+
+M-z-6：self.flying()（自身在天上）
+描述：同下
+
+M-z-7：self.isFlying()（自身在天上）
+描述：如果单位在天上飞行，则执行。
+正确例子：if self.isFlying()
+值类型：boolean
+
+M-z-8：self.isMoving()（自身在移动）
+描述：如果自身在移动则执行。
+正确例子：if self.isMoving()
+值类型：boolean
+
+M-z-9：self.isAtTopSpeed()（自身到最高速度）
+描述：如果到达最高速度则执行。等同self.maxspeed()
+正确例子：if self.isAtTopSpeed()
+值类型：boolean
+
+M-z-10：self.isInWater()（自身在水中）
+描述：如果自身在水中则执行。等同于self.inwater()。
+正确例子：if self.isInWater()
+值类型：boolean
+
+M-z-11：self.inWater()（自身在水中）
+描述：如果自身在水中则执行。等同于self.isinwater()。
+正确例子：if self.inWater()
+值类型：boolean
+
+M-z-12：self.isOverwater()（自身在水上）
+描述：如果自身投影在水面这种地形则执行。
+正确例子：if self.isOverwater()
+值类型：boolean
+
+M-z-13：self.overWater()（自身在水上）
+描述：同上
+正确例子：if self.overWater()
+值类型：boolean
+
+M-z-14：self.isOverLiquid()（自身在液体上）
+描述：如果自身在液体则执行。岩浆算为液体。
+正确例子：if self.isOverLiquid()
+值类型：boolean
+
+M-z-15：self.isOverClift()（自身在悬崖上）
+描述：如果自身在悬崖上则执行。等同self.isOverCliff()
+正确例子：if self.isOverClift()
+值类型：boolean
+
+M-z-16：self.isOverPassableTile()（自身在地块类型上）
+描述：如果自身在这类通行地块上则执行，类型：无、陆地、建筑、空中、水面、两栖、跨悬崖、跨水和悬崖；NONE、LAND、BUILDING、AIR、WATER、HOVER、OVER_CLIFF、OVER_CLIFF_WATER
+正确例子：if self.isOverPassableTile(type="WATER")
+值类型：boolean
+
+M-z-17：self.isOverOpenLand()（自身在开阔地带）
+描述：如果自身在开阔地带则执行。self.isOverPassableTile（type ='LAND'）的快捷方式
+正确例子：if self.isOverOpenLand()
+值类型：boolean
+
+M-z-18：self.height()（自身高度）
+描述：如果自身在特定高度则执行。参数:greaterThan,lessThan,equalTo,empty,full(参数，超过，少于，等于，空，满))
+正确例子：if self.height(lessThan=50)
+值类型：boolean
+
+M-aa：单位统计
+
+M-aa-1：self.hasResources()（自身有资源）
+描述：可以检查多种资源（所有价格参数）
+正确例子：if self.hasResources(credits=5000)
+值类型：boolean
+
+M-aa-2：self.resource()（自身资源）
+描述：检查单个资源条件。（参数：greaterThan,lessThan,equalTo）参数，超过，少于，等于
+正确例子：if self.resource(type="NAMMO",greaterThan=35)
+值类型：boolean
+
+M-aa-3：self.resource.RESOURCE_TYPE（自身资源类型）
+描述：此为快捷方式，可直接使用，原代码为self.resource(type='RESOURCE_TYPE')
+正确例子：addResourcesWithLogic: hp += self.resource.gold
+值类型：boolean
+
+M-aa-4：self.isResourceLargerThan()（自身资源大于）
+描述：比较两个资源，注意，multiplyTargetBy不造成资源改变。(参数：来源，比较目标，超过，乘数 source=x, compareTarget=x, byMoreThan=x, multiplyTargetBy=x)
+正确例子：if self.isResourceLargerThan(compareTarget=nearestUnit)
+值类型：boolean
+
+M-aa-5：self.maxHp()（自身最大血量）
+描述：自身最大血量条件。
+正确例子：if self.maxHp >= 10000
+值类型：boolean
+
+M-aa-6：self.hp()（自身血量）
+描述：自身血量条件。参数:greaterThan,lessThan,equalTo,empty,full(超过，少于，等于，空，满)
+正确例子：if self.hp(lessThan=100)
+值类型：boolean
+
+M-aa-7：self.ammo()（自身弹药）
+描述：自身弹药条件。参数:greaterThan,lessThan,equalTo,empty,full(参数，超过，少于，等于，空，满)
+正确例子：if self.ammo(lessThan=100)
+值类型：boolean
+
+M-aa-8：self.maxShield()（自身最大护盾）
+描述：自身最大护盾
+正确例子：if self.maxShield >= 10000
+值类型：boolean
+
+M-aa-9：self.maxEnergy()（自身最大能量）
+描述：自身最大能量
+正确例子：if self.maxEnergy >= 10000
+值类型：boolean
+
+M-aa-10：self.isEnergyRecharging()（自身正在充能）
+描述：自身正在充能
+正确例子：if self.isEnergyRecharging()
+值类型：boolean
+
+M-aa-11：self.isAmmoEmpty()（自身弹药空）
+描述：自身弹药为空。self.ammo(empty=true)的快捷方式
+正确例子：if self.isAmmoEmpty()
+值类型：boolean
+
+M-aa-12：self.ammoIncludingQueued()（自身弹药包括队列）
+描述：自身弹药数量，包括还在队列中的。参数:greaterThan,lessThan,equalTo,empty,full(参数：大于，小于，等于，空，满)
+正确例子：if self.ammoIncludingQueued(lessThan=12)
+值类型：boolean
+
+M-aa-13：self.energy()（自身能量）
+描述：自身能量数值。参数:greaterThan,lessThan,equalTo,empty,full(参数，超过，少于，等于，空，满)
+正确例子：if self.energy(empty=true)
+值类型：boolean
+
+M-aa-14：self.energyIncludingQueued()（自身能量包括队列）
+描述：自身能量数值，包括还在队列中的。(参数:greaterThan,lessThan,equalTo,empty,full)参数：大于，小于，等于，空，满
+正确例子：if self.energyIncludingQueued(lessThan=12)
+值类型：boolean
+
+M-aa-15：self.isEnergyFull()（自身能量满）
+描述：自身能量为满。self.energy(full=true)的快捷方式
+正确例子：if self.isEnergyFull()
+值类型：boolean
+
+M-aa-16：self.isEnergyEmpty()（自身能量空）
+描述：自身能量为空。self.energy(empty=true)的快捷方式。
+正确例子：if self.isEnergyEmpty()
+值类型：boolean
+
+M-aa-17：self.shield()（自身护盾）
+描述：自身护盾数值。(参数:greaterThan,lessThan,equalTo,empty,full)参数：大于，小于，等于，空，满
+正确例子：if self.shield(greaterThan=233)
+值类型：boolean
+
+M-aa-18：self.kills()（自身杀敌数）
+描述：自身杀敌数量。(参数:greaterThan,lessThan,equalTo)（参数：大于，小于，等于）
+正确例子：if self.kills(greaterThan=99)
+值类型：boolean
+
+M-aa-19：self.queueSize()（自身队列量）
+描述：自身队列数量。(参数:greaterThan,lessThan,equalTo,empty,full,withActionTag)参数：大于，小于，等于，空，满，有行动标签
+正确例子：if self.queueSize(greaterThan=2)
+值类型：boolean
+
+M-aa-20：self.id()（自身id）
+描述：返回自身的单位id，每个单位的id都不一样，如果id小的死了，后面生成的单位就会占用那个id
+正确例子：if self.id == 1246
+值类型：boolean
+
+M-aa-21：self.teamId()（自身队伍id）
+描述：返回单位或标记的团队 ID。 从0开始。
+正确例子：if self.teamId == 1
+值类型：boolean
+
+M-aa-22：self.playerName()（玩家名称）
+描述：返回游戏中玩家的昵称，类型为字符串
+正确例子：if self.playerName == "N.D.T."
+值类型：boolean
+
+M-aa-23：self.teamName()（队伍名称）
+描述：返回自身队伍的名称，一般情况下，铁锈默认的都是ABCDEF
+正确例子：if self.teamName == "A"
+值类型：boolean
+
+M-aa-24：self.x(), self.y(), self.z()（自身坐标分量）
+描述：返回单位的坐标分量
+正确例子：if self.x() == 0 and self.y() == 0 and self.z() == 0
+值类型：boolean
+
+M-aa-25：self.dir()（自身角度）
+描述：返回单位的方向
+正确例子：if self.dir() == 0
+值类型：boolean
+
+M-aa-26：self.priceCredits()（自身资源价格）
+描述：返回单位的资源价格
+正确例子：if self.priceCredits() <= 10000
+值类型：boolean
+
+M-ab：杂项
+
+M-ab-1：self.hasFlag()（自身有标志）
+描述：自身拥有标志。可用通过增加资源和价格修改。（参数：id = 0-31/[logicNumber]），使用addResources在action中更改此vaule
+正确例子：if self.hasFlag(id=self.ammo)
+值类型：boolean
+
+M-ab-2：self.tags()（自身有标签）
+描述：自身拥有标签。等同self.hasTags()
+正确例子：if not self.tags(includes='TAG_shiba')
+值类型：boolean
+
+M-ab-3：self.hasTags()（自身有标签）
+描述：自身拥有标签。等同self.tags()
+正确例子：if not self.hasTags(includes='TAG_shiba')
+值类型：boolean
+
+M-ab-4：self.globalTeamTags()（有全局标签）
+描述：有全局标签，(parameters: includes)参数:包括
+正确例子：if self.globalTeamTags(includes="GLBTAG_shiba")
+值类型：boolean
+
+M-ab-5：self.transportingCount()（自身运输数量）
+描述：载具运输单位数量(parameters: greaterThan, lessThan,equalTo,empty)（参数：大于，小于，等于，为空）
+正确例子：if self.transportingCount(greaterThan=1)
+值类型：boolean
+
+M-ab-6：self.numberOfAttachedUnits()（自身子单位数量）
+描述：自身有子单位数量。（withTag,greaterThan,lessThan,equalTo）参数:标签，大于、小于、等于
+正确例子：if self.numberOfAttachedUnits(withTag=ANM_cat',lessThan=1)
+值类型：boolean
+
+M-ab-7：self.isAttacking()（自身在攻击）
+描述：单位正在攻击。
+正确例子：if self.isAttacking()
+值类型：boolean
+
+M-ab-8：self.hasActiveWaypoint()（自身有活动的路径点）
+描述：单位当前活动的路径点为此类型。类型=路径点类型。（[type = WAYPOINT_TYPE]）
+正确例子：if self.hasActiveWaypoint(type='touchTarget')
+值类型：boolean
+
+M-ab-9：self.transportingUnitWithTags()（自身运输单位有标签）
+描述：自身运输单位有标签(parameters: includes)参数:包括
+正确例子：if self.transportingUnitWithTags(includes='human')
+值类型：boolean
+
+M-ab-10：self.isTransportUnloading()（自身在卸载单位）
+描述：卸载单位时
+正确例子：if self.isTransportUnloading()
+值类型：boolean
+
+M-ab-11：self.hasParent()（自身有父单位）
+描述：用于子单位和载员逻辑。有父单位时执行。可选参数:需要标签。withTag ="unit"
+正确例子：if self.hasParent()
+值类型：boolean
+
+M-ab-12：self.hasTakenDamage()（受到伤害）
+描述：单位受到伤害。参数：几秒内，几秒后。(parameters:withinSeconds=X,laterThanSeconds=X)
+正确例子：if self.hasTakenDamage(withinSeconds=1)
+值类型：boolean
+
+M-ab-13：self.timeAlive()（存活时间）
+描述：单位存活时间。参数：几秒内，几秒后。(parameters:withinSeconds=X,laterThanSeconds=X)
+正确例子：if self.timeAlive(laterThanSeconds=10)
+值类型：boolean
+
+M-ab-14：self.lastConverted()（最后转换时间）
+描述：单位最后转换时间。参数：几秒内，几秒后。(parameters:withinSeconds=X,laterThanSeconds=X)
+正确例子：if self.lastConverted(laterThanSeconds=10)
+值类型：boolean
+
+M-ab-15：self.customTimer()（自身自定义计时器）
+描述：自身自定义计时器。参数：几秒内，几秒后。(parameters:withinSeconds=X,laterThanSeconds=X)
+正确例子：if self.customTimer(laterThanSeconds=99)
+值类型：boolean
+
+M-ab-16：self.isOnNeutralTeam()（自身在中立队伍）
+描述：自身在中立队伍。
+正确例子：if self.isOnNeutralTeam()
+值类型：boolean
+
+M-ab-17：numberOfUnitsInTeam()（队伍中此单位数量）
+描述：玩家自身拥有单位数量。(参数:withTag,greaterThan,lessThan,withinRange,incompleteBuildings,factoryQueue)；参数：标签，超过，少于，范围，建造中，队列中
+正确例子：if numberOfUnitsInTeam(withTag='techUnlockBuilding', greaterThan=0)
+值类型：boolean
+
+M-ab-18：self.numberOfUnitsInAllyTeam()（我方有单位数量）
+描述：我方拥有此单位的数量。(参数:withTag,greaterThan,lessThan,withinRange,incompleteBuildings,factoryQueue)
+正确例子：if self.numberOfUnitsInAllyTeam(withTag="cat",greaterThan=0,withinrange=99)
+值类型：boolean
+
+M-ab-19：self.numberOfUnitsInAllyNotOwnTeam()（盟友有单位数量）
+描述：盟友拥有此单位的数量。(参数:withTag,greaterThan,lessThan,withinRange,incompleteBuildings,factoryQueue)
+正确例子：if self.numberOfUnitsInAllyNotOwnTeam(withTag="cat",greaterThan=0,withinrange=99)
+值类型：boolean
+
+M-ab-20：numberOfUnitsInEnemyTeam()（敌人有单位数量）
+描述：敌人拥有此单位的数量。(参数:withTag,greaterThan,lessThan,withinRange,incompleteBuildings,factoryQueue)
+正确例子：if numberOfUnitsInEnemyTeam(withTag="cat",greaterThan=0,withinrange=99)
+值类型：boolean
+
+M-ab-21：numberOfUnitsInNeutralTeam()（中立有单位数量）
+描述：中立队伍拥有单位数量。(参数:withTag,greaterThan,lessThan,withinRange,incompleteBuildings,factoryQueue)
+正确例子：if numberOfUnitsInNeutralTeam(withTag="cat",greaterThan=0,withinrange=99)
+值类型：boolean
+
+M-ab-22：numberOfUnitsInAggressiveTeam()（敌对中立拥有单位数量）
+描述：特殊的“对所有人都有侵略性”的队伍,这与numberOfUnitsInEnemyTeam不同.(参数:withTag, greaterThan, lessThan, withinRange, incompleteBuildings, factoryQueue
+正确例子：if numberOfUnitsInAggressiveTeam()
+值类型：boolean
+
+M-ab-23：numberOfUnitsInAllTeams()（所有队伍拥有单位数量）
+描述：所有队伍拥有单位数量。(参数:withTag,greaterThan,lessThan,withinRange,incompleteBuildings,factoryQueue)
+正确例子：if self.numberOfUnitsInAllTeams(withTag="tech")
+值类型：boolean
+
+M-ab-24：self.hasUnitInTeam()（自身队伍有单位）
+描述：自身队伍拥有单位数量。(参数:withTag，withinRange，incompleteBuildings，factoryQueue)numberOfUnitsInTeam的别名
+正确例子：if self.hasUnitInTeam(withTag="tech")
+值类型：boolean
+
+M-ab-25：self.noUnitInTeam()（自身队伍无单位）
+描述：自身队伍单位数量不满足。(参数:withTag，withinRange，incompleteBuildings，factoryQueue)numberOfUnitsInTeam的别名
+正确例子：if self.noUnitInTeam(withTag="tech")
+值类型：boolean
+
+M-ab-26：self.isInMap()（自身在地图内）
+描述：判断自身是否在地图内：地图外指那些黑色的边缘外面
+正确例子：if self.isInMap()
+值类型：boolean
+
+M-ab-27：game.mapWidth()（正在游戏的地图宽度）
+描述：检测正在游戏的地图宽度
+正确例子：if game.mapWidth() == 10000
+值类型：boolean
+
+M-ab-28：game.mapHeight()（正在游戏的地图高度）
+描述：检测正在游戏的地图高度
+正确例子：if game.mapHeight() == 10000
+值类型：boolean
+
+M-ab-29：self.isReversing()（自我正在反转）
+描述：逻辑布尔值
+正确例子：if self.isReversing()
+值类型：boolean
+
+M-ab-30：self.isControlledByAI()（自身属于AI控制）
+描述：单位归属于AI所属方控制。
+正确例子：if self.isControlledByAI()
+值类型：boolean
+
+M-ab-31：self.readUnitMemory()（读取单位内存）
+描述：(name:string, type:string{boolean,unit,float,string}, [default])；注：1.15p11 更新数组后，新增了三种数组引用方式，并支持数组条件判断。；数组引用方式一：self.readUnitMemory('numArray', type='number', index=<value:number>)；数组引用方式二：self.readUnitMemory('numArray', type='float[]')[<value:number>]；数组引用方式三：self.readUnitMemory('numArray', type='float[]').get(self.hp)；数组其他函数：；self.readUnitMemory('numArray', type='float[]').size()；self.readUnitMemory('numArray', type='float[]').length()；self.readUnitMemory('numArray', type='float[]').contains(self.hp)
+正确例子：if parent.readUnitMemory('boostTarget', type='unit') == self
+值类型：boolean
+
+M-ab-32：self.eventData()（事件数据）
+描述：与sendMessageWithData连用，从严格意义上来讲，这个key并不属于内存(name:string, type:string{boolean,unit,float,string}, [default])；eventData 支持数组传递。
+正确例子：if parent.eventData('boostTarget', type='unit' , default=nearestUnit) == self
+值类型：boolean
+
+M-ab-33：memory.NAME（内存）
+描述：使用当前defineUnitMemory以及@memory类型读取自身的快捷方式。
+约束：只能用于当前单位；跨单位读取请使用 readUnitMemory；不要在定义该内存的同一逻辑中自我递归调用
+正确例子：autoTrigger: if memory.experience > 100
+值类型：boolean
+
+M-ab-34：memory.NAME[<Array_Lower_Limit>]（返回内存数组）
+描述：使用当前defineUnitMemory以及@memory类型读取自身的快捷方式。
+约束：只能用于当前单位；跨单位读取请使用 readUnitMemory；不要在定义该内存的同一逻辑中自我递归调用
+正确例子：autoTrigger: if memory.experience[1] > 100
+值类型：boolean
+
+M-ab-35：memory.MEMORY_NAME.size()（数组内存大小）
+描述：对于类型是数组的内存使用，告诉你当前数组有几个不同的值
+正确例子：if memory.array.size() >= 1
+值类型：boolean
+
+M-ab-36：memory.MEMORY_NAME.length()（数组内存长度）
+描述：对于类型是数组的内存使用，告诉你当前数组有几个不同的值
+正确例子：if memory.array.length() >= 1
+值类型：boolean
+
+M-ab-37：memory.MEMORY_NAME.get()（数组内存获取）
+描述：括号里填logic或者integer，返回该索引所代表的值
+正确例子：if memory.array.get(1) == 1
+值类型：boolean
+
+M-ab-38：memory.MEMORY_NAME.contains()（数组内存包含）
+描述：填与内存类型相应的值，也可以填logic，用于检测数组里面有没有该值，如果有则返回TRUE，否则返回FALSE
+正确例子：if memory.array.contains(nearestUnit) == true
+值类型：boolean
+
+M-ab-39：self.numberOfQueuedWaypoints()（自身某种路径点的队列数量）
+描述：小括号里写路径点种类(parameters: greaterThan, lessThan,equalTo,empty,full)（参数：大于，小于，等于，为空，为满）
+正确例子：if self.numberOfQueuedWaypoints(type='move',full=true)
+值类型：boolean
+
+M-ab-40：self.speed()（自身速度）
+描述：Current unit speed（目前的单位速度）
+正确例子：if self.speed() >= 0
+值类型：boolean
+
+M-ab-41：self.maxspeed()（自身达到最大速度）
+描述：单位已经到达单位所能到达的最大速度
+正确例子：if self.maxspeed() == true
+值类型：boolean
+
+M-ab-42：self.isAtTopSpeed()（自身到达最大速度）
+描述：单位已经到达单位所能到达的最大速度
+正确例子：if self.isAtTopSpeed()
+值类型：boolean
+
+M-ab-43：self.builtAmount()（自身建造数量）
+描述：(似乎不包括使用autoTrigger建造的数量)How much this unit is built. 1 when complete. Note only events trigger on incomplete units, not autoTrigger（这个单位建造了多少。 1 完成后。仅注意不完整单位触发的事件，）
+正确例子：if self.builtAmount() > 0
+值类型：boolean
+
+M-ab-44：self.completed()（自身建造完成）
+描述：(比如建造者造了一半的建筑就是0,建造完成就是1)Shortcut for checking built is（是检查已建成的快捷方式）
+正确例子：if self.completed()
+值类型：boolean
+
+M-ab-45：self.maxMoveSpeed()（自身最大移动速度）
+描述：自身最大移动速度
+正确例子：if self.maxMoveSpeed() >= 0
+值类型：boolean
+
+M-ab-46：self.teamDefeatedTech()（队伍失败）
+描述：队伍失败
+正确例子：if self.teamDefeatedTech()
+值类型：boolean
+
+M-ab-47：self.teamWipedOut()（队伍无单位）
+描述：(ps:都没单位了哪个单位检测队伍没单位?所以应该是只能由禁止受到攻击的单位(此单位不计入总数)来判断)
+正确例子：if self.teamWipedOut()
+值类型：boolean
+
+M-ab-48：self.numberOfConnections（自身连接数）
+描述：括号里填写行动名称
+正确例子：if self.numberOfConnections(name="XXX") >= 10
+值类型：boolean
+
+M-ab-49：self.teamVictory()（队伍获胜）
+描述：队伍获胜
+正确例子：if self.teamVictory()
+值类型：boolean
+
+M-ac：单位引用
+分类说明：例子太长，写描述里面
+
+M-ac-1：thisActionTarget（当前动作目标）
+描述：当前目标或定位的位置。；• alsoTriggerAction: x (thisActionTarget==Same as original action(与原动作相同))；• [turret]onShoot_triggerActions: x (thisActionTarget==Target that was shot at(被击中的目标))；• takeResources_triggerActionIfAnyCollected: x (thisActionTarget==Target with resources(带有资源的目标))；• addWaypoint_triggerActionIfMatched: x (thisActionTarget == Marker for move/Target for attack, etc. Note: use addWaypoint_maxTime:0 if you want to search only；• 移动动作的标记/攻击的目标等。；注：如果只是想搜索，请使用addWaypoint_maxTime: 0
+正确例子：setResourcesWithLogic:Res=(thisActionTarget.resource.credits)
+值类型：unit / marker
+
+M-ac-2：eventSource（事件来源）
+描述：来自 autoTriggerOnEvent 的当前触发器，否则为 null。；示例：autoTriggerOnEvent: tookDamage（thisActionTarget == Unit that caused damage，指造成伤害的单位）；示例：autoTriggerOnEvent: killedAnyUnit（thisActionTarget == Unit that was killed，指被击杀单位）；示例：autoTriggerOnEvent: transportingNewUnit（thisActionTarget == Unit that was transported，指被运输单位）；示例：autoTriggerOnEvent: transportUnloadedOrRemovedUnit（thisActionTarget == Unit unloaded，指被卸载单位）；示例：autoTriggerOnEvent: queuedUnitFinished（thisActionTarget == New unit made，指新生产单位）；示例：autoTriggerOnEvent: touchTargetSuccess（thisActionTarget == Target touched，指被触碰目标）；其余事件同理。
+正确例子：addResourcesWithLogic:Res=(eventSource.resource.credits)
+值类型：unit / marker
+
+M-ac-3：attachment（附件）
+描述：（参数：[slot(槽位)]、[withTag(带有标签)]）；self.attachment(withTag='x').lastDamagedBy.getAsMarker()
+正确例子：setResourcesWithLogic:Res=(attachment(slot=0).resource.credits)
+值类型：unit
+
+M-ac-4：transporting（运输）
+描述：参数：[slot]。例如：if self.transporting(slot=0).hasResources(gold=100)
+正确例子：addResourcesWithLogic:Res=(transporting(slot=0).resource.credits)
+值类型：unit
+
+M-ac-5：attacking（攻击）
+描述：当前正在攻击的目标，可能不是当前的路径点目标。；if attacking.tags(includes='bug') and attacking.hp < 20
+正确例子：setResourcesWithLogic:Res=(attacking.resource.credits)
+值类型：unit
+
+M-ac-6：lastDamagedBy（最后伤害源）
+描述：最后一个攻击这个的单位。
+正确例子：addResourcesWithLogic:Res=(lastDamagedBy.resource.credits)
+值类型：unit
+
+M-ac-7：parent（父单位）
+描述：传输器或附件父级。 （注：单元在无连接槽位时运输时处于暂停状态）；Eg autoTrigger: if parent.energy > 100
+正确例子：setResourcesWithLogic:Res=(parent.resource.credits)
+值类型：unit
+
+M-ac-8：activeWaypointTarget（活动路径点目标）
+描述：当前活动航路点目标。 包括攻击、运输、修理等。；if distanceBetween(self, activeWaypointTarget) < 100
+正确例子：addResourcesWithLogic:Res=(activeWaypointTarget.resource.credits)
+值类型：unit
+
+M-ac-9：customTarget1（自定义目标1）
+描述：自定义内存，默认为创建该单位的单位。；if parent.customTarget1 == self
+正确例子：setResourcesWithLogic:Res=(customTarget1.resource.credits)
+值类型：unit
+
+M-ac-10：customTarget2（自定义目标2）
+描述：自定义内存，默认为空
+正确例子：addResourcesWithLogic:Res=(customTarget2.resource.credits)
+值类型：unit
+
+M-ac-11：nearestUnit（距离自己最近的单位）
+描述：(withinRange=500, withTag='x',relation='any',incompleteBuildings=true,withoutTag="xg") 搜索一个距离自己最近的单位（不推荐在 autoTrigger 中进行检查）；该单位引用支持 withoutTag（排除标签）参数。
+正确例子：setResourcesWithLogic:Res=(nearestUnit.resource.credits)
+值类型：unit
+
+M-ac-12：globalSearchForFirstUnit（全局检查第一个单位）
+描述：(withTag=x,relation=any,incompleteBuildings=true) - 返回找到的与过滤器匹配的第一个（也是最旧的）单元。 慢，避免在 autoTrigger 检查中使用
+正确例子：addResourcesWithLogic:Res=(globalSearchForFirstUnit.resource.credits)
+值类型：unit
+
+M-ac-13：nullUnit（空单位）
+描述：返回一个空单位引用，用于比较
+正确例子：if self.parent == nullUnit
+值类型：null
+
+M-ac-14：null（空）
+描述：返回一个零值，可以用来检测单位引用为空
+正确例子：if self.parent == null
+值类型：null
+
+M-ad：标记功能
+
+M-ad-1：getAsMarker()（获取为标记）
+描述：在一个单位现在所在的位置创建一个临时标记。 标记的创建速度非常快，不再需要时会自动删除。 不链接到任何单位并且在单位死亡时仍然存在，并且在源移动时保持不变。
+正确例子：if self.lastDamagedBy.getAsMarker() == nearestUnit()
+值类型：marker
+
+M-ad-2：getOffsetAbsolute()（获取绝对偏移）
+描述：([x],[y],[height]) 返回具有绝对偏移量的标记（-y 是北，+x 是东）
+正确例子：if lastDamagedBy.getOffsetAbsolute() == self
+值类型：marker
+
+M-ad-3：getOffsetRelative()（获取相对偏移）
+描述：([x],[y],[height],[dirOffset]) 返回具有相对偏移量的标记。 (y+ 是向前)；self.getOffsetRelative(y=100).nearestUnit(withinRange=70, withTag='mouse') != null
+正确例子：if lastDamagedBy.getOffsetRelative() == self
+值类型：marker
+
+M-ad-4：createMarker()（创造记号）
+描述：([x],[y],[height],[dir],[teamId]) 返回地图标记。 (y+是向下)；createMarker(teamId=self.teamId).nearestUnit(withinRange=70, withTag='mouse') != null
+约束：使用 createMarker 创建的记号默认队伍所属是中立，因此单位引用中的 relation="own" 在不设置 teamId=self.teamId() 的时候将会失效
+正确例子：if createMarker(x=1,y=1).nearestUnit == null
+值类型：marker
+
+M-ae：全局功能
+
+M-ae-1：distance(x1, y1, x2, y2)（点距离）
+描述：计算两点之间的距离
+正确例子：autoTrigger:if distance(self.x(),self.y(),memory.target.x(),memory.target.y()) < 400
+值类型：function
+
+M-ae-2：distanceSquared(x1, y1, x2, y2)（点距离方差）
+描述：返回两点之距离差的平方。 比distance快，因为少了开方这一步。
+正确例子：autoTrigger:if distanceSquared(self.x(),self.y(),memory.target.x(),memory.target.y()) < 400
+值类型：function
+
+M-ae-3：distanceBetween(unit1, unit2)（单位距离）
+描述：返回两个单位之间的距离
+正确例子：distanceBetween(self, activeWaypointTarget) < 100
+值类型：function
+
+M-ae-4：distanceBetweenSquared(unit1, unit2)（单位距离方差）
+描述：返回两个单位之间的平方距离。 比 distanceBetween 快一点
+正确例子：if distanceBetweenSquared(self, self.attacking) > 1000
+值类型：function
+
+M-ae-5：game.nukesEnabled()（核武启用）
+描述：如果在此游戏的设置中启用了核武器，则返回 true。
+正确例子：if game.nukesEnabled()
+值类型：function
+
+M-ae-6：int([float])（取整）
+描述：从数字中删除小数位。（可以在${x}中使用）
+正确例子：if int(4.2) == 4；price:${int(a)}（这里我们假设a是1.4，则该值返回1）
+值类型：functiom
+
+M-ae-7：select(LogicBoolean, logicA, logicB)（选择）
+描述：如果布尔值为真则返回 textA 否则返回 textB
+正确例子：if select(self.isMoving,5,-5) == 5
+值类型：function
+
+M-ae-8：debug(LogicBoolean)（调试）
+描述：返回一个文本，显示该单位有关于这个逻辑的数据
+正确例子：if str(debug(self.hp)) == "Hp=2400"
+值类型：function
+
+M-ae-9：debugPassthrough(LogicBoolean)（调试通行）
+描述：显示这个逻辑在该单位上的值，并在调试模式中发送单位本身关于这个逻辑的调试消息，请打开调试模式选中单位后查看
+正确例子：if str(debugPassthrough(self.hp)) == "2400"
+值类型：function
+
+M-ae-10：str(x)（转为字符串）
+描述：将数字、单位、布尔值、逻辑显示值等转换为字符串
+正确例子：if str(self.energy)+'x' == '100x'
+值类型：function
+
+M-ae-11：substring(string,logicNumber(start),logicNumber(end))（子字符串）
+描述：提取指定字符串长度内的字符串，例如 substring('hello',0,2) == 'he'
+正确例子：if substring('hello',0,2) == 'he'
+值类型：function
+
+M-ae-12：length(string)（字符串长度）
+描述：以数字形式返回字符串或者值类型是字符串的逻辑长度
+正确例子：if length("string") == 6
+值类型：function
+
+M-ae-13：squareRoot(num)（开方）
+描述：返回一个数的平方根
+正确例子：if squareRoot(4) == 2
+值类型：function
+
+M-ae-14：sqrt(num)（开方）
+描述：返回一个数的平方根（只能在${x}中使用）
+正确例子：price:${sqrt(a)}（这里我们假设a是4，则该值返回2）
+值类型：function
+
+M-ae-15：min(num1, min2)（最小值）
+描述：返回最小的数字
+正确例子：damage = min(self.hp, self.energy)
+值类型：function
+
+M-ae-16：max(num1, min2)（最大值）
+描述：返回最大的数字
+正确例子：max(5, 10) == 10
+值类型：function
+
+M-ae-17：cos([float])（算余弦）
+描述：返回填入的值的余弦（可以在${x}中使用）
+正确例子：if cos(60) == 0.5；price:${cos(a)}（这里我们假设a是0，则该值返回1）
+值类型：functiom
+
+M-ae-18：sin([float])（算正弦）
+描述：返回填入的值的正弦（可以在${x}中使用）
+正确例子：if sin(30) == 0.5；price:${sin(a)}（这里我们假设a是0，则该值返回0）
+值类型：functiom
+
+M-ae-19：thisActionIndex/index（行动索引/索引）
+描述：由alsoTriggerActionRepeat和alsoTriggerAction连用来改变该logic的值（通俗点来讲，就是被also触发的顺序位）
+正确例子：if index/thisActionIndex == 1
+值类型：function
+
+M-ae-20：uppercase(string)（字符大写）
+描述：给字符串中的所有小写字母进行大写处理
+正确例子：if uppercase("abc") == "ABC"
+值类型：function
+
+M-ae-21：lowercase(string)（字符小写）
+描述：给字符串中的所有大写字母进行小写处理
+正确例子：if lowercase("ABC") == "abc"
+值类型：function
+
+M-ae-22：direction(x1,y1,x2,y2)（点朝向）
+描述：给出两个点之间的直线相对于前者的点朝向的角度
+正确例子：if direction(1,1,10,10) == 45
+值类型：function
+
+M-ae-23：directionBetween(unit1,unit2)（单位朝向）
+描述：给出两个单位参考之间的直线相对于前者单位朝向的角度
+正确例子：if directionBetween(self,self.customTarget1) == 90
+值类型：function
+
+M-ae-24：true()（真()）
+描述：if语句里套一个true()......
+正确例子：if true() and true() == true
+值类型：function
+
+M-ae-25：false()（假()）
+描述：if语句里套一个false()......
+正确例子：if false() and true() == false
+值类型：function
+
+M-ae-26：rnd(min[float],max[float])（范围内随机取数）
+描述：可能会是浮点值，可以使用int()取整数部分
+正确例子：if rnd(1,100) == 50
+值类型：function
+
+N：放置规则[placementRule_NAME]
+
+N-1：anyRuleInGroup（放置规则组）
+描述：放置规则组名。（仅需要通过此组规则中的1条，而不是全部通过。在其他放置规则中可使用相同的组名称来创建组。）
+正确例子：anyRuleInGroup:DogFoodPlace
+值类型：string
+
+N-2：searchTags（检索标签）
+描述：搜索至少包含这些标签之一的任何单位
+正确例子：searchTags:redFox
+值类型：string(s)
+
+N-3：searchTeam（检索队伍）
+描述：要搜索的团队可以是：自身|中立|盟友非自身|盟友|敌人|任何。 own|neutral|allyNotOwn|ally|enemy|any
+正确例子：searchTeam:own
+值类型：enum
+
+N-4：searchOffsetX（检索偏移）
+描述：检索偏移，默认为0
+正确例子：searchOffsetX:0
+值类型：float
+
+N-5：searchOffsetY（检索偏移）
+描述：检索偏移，默认为0
+正确例子：searchOffsetY:0
+值类型：float
+
+N-6：searchDistance（搜索距离）
+描述：搜索距离
+正确例子：searchDistance:99
+值类型：float
+
+N-7：excludeIncompleteBuildings（排除不完整建筑）
+描述：排除不完整的建筑
+正确例子：excludeIncompleteBuildings:true
+值类型：boolean
+
+N-8：excludeNonBuildings（排除非建筑）
+描述：排除非建筑
+正确例子：excludeNonBuildings:true
+值类型：boolean
+
+N-9：minCount（最小数量）
+描述：设定需要在搜索中找到的单位的最小数量。(如需要靠近某物)。默认值为0
+正确例子：minCount:1
+值类型：integer
+
+N-10：maxCount（最大数量）
+描述：在匹配失败前设置最大单位数量(例如不能接近某个值)。默认为无限的
+正确例子：maxCount:1
+值类型：integer
+
+N-11：blocksPlacement（禁止放置）
+描述：锁定放置。默认为true。
+正确例子：blocksPlacement:true
+值类型：boolean
+
+N-12：cannotPlaceMessage（失败信息）
+描述：如果此放置规则失败，则会向玩家显示消息（将成为mergedRuleGroup中的第一个失败规则）
+正确例子：cannotPlaceMessage:您不能睡觉，因为附近有chemms在游荡~
+值类型：string
+
+N-13：cannotPlaceMessage_[Language]（失败信息(多语言)）
+描述：如果此放置规则失败，则会向玩家显示消息（将成为mergedRuleGroup中的第一个失败规则）（支持多种语言显示）
+正确例子：cannotPlaceMessage_zh:您不能睡觉，因为附近有chemms在游荡~
+值类型：string
+
+N-14：checkEachTile（检查每个地块）
+描述：[true / false]默认为true（仅对测试单元中心设置为false，true会检查显示在放置网格上的单元下方的每个图块）
+正确例子：checkEachTile:true
+值类型：boolean
+
+N-15：aiSuggestionOnly（仅限ai建议）
+描述：不能与blocksPlacement一起使用，仅仅只是建议AI这么做
+约束：不能与 blocksPlacement 同时使用
+正确例子：aiSuggestionOnly:true
+值类型：boolean
+
+N-16：credits（资金）
+描述：由addResources，price等使用；铁锈中默认用于全局的资金。
+正确例子：credits:600
+值类型：Resources
+
+N-17：energy（能量）
+描述：单位使用的能量，如可用于开火限制。
+正确例子：energy=50
+值类型：Resources
+
+N-18：hp（血量）
+描述：单位血量，一般血量归零时就会销毁单位。
+正确例子：hp:40
+值类型：Resources
+
+N-19：shield（护盾）
+描述：单位护盾，一般用于抵挡敌人攻击。
+正确例子：price: hp=-100, shield=100
+值类型：Resources
+
+N-20：ammo（弹药）
+描述：弹药，每个单位的隐藏值，供mod使用。
+正确例子：ammo=1
+值类型：integer
+
+N-21：setFlag（设置标志）
+描述：设置标志。标志存储在每个单位中，可与 addResources、resourceUsage、price 等一起使用。；版本差异：1.15 之前范围为 0-31，1.15 起改为无限制。
+约束：衔接符 , 代表和，即同时设置a和b；衔接符 | 代表或，即设置a和b两个中的其中一个；衔接符 - 代表到，即从a到b一路设置过来
+正确例子：setFlag:1，setFlag=1,3
+值类型：integer
+
+N-22：unsetFlag（取消标志）
+描述：取消已设置的标志。；版本差异：1.15 之前范围为 0-31，1.15 起改为无限制。
+约束：衔接符 , 代表和，即同时设置a和b；衔接符 | 代表或，即设置a和b两个中的其中一个；衔接符 - 代表到，即从a到b一路设置过来
+正确例子：unsetFlag=1 , unsetFlag:1-5
+值类型：integer
+
+N-23：hasFlag（拥有标志）
+描述：判断是否拥有标志。；版本差异：1.15 之前范围为 0-31，1.15 起改为无限制。
+约束：衔接符 , 代表和，即同时设置a和b；衔接符 | 代表或，即设置a和b两个中的其中一个；衔接符 - 代表到，即从a到b一路设置过来
+正确例子：hasFlag:1，hasFlag=1|2
+值类型：integer
+
+N-24：hasMissingFlag（没有标志）
+描述：判断是否缺少标志。；版本差异：1.15 之前范围为 0-31，1.15 起改为无限制。
+约束：衔接符 , 代表和，即同时设置a和b；衔接符 | 代表或，即设置a和b两个中的其中一个；衔接符 - 代表到，即从a到b一路设置过来
+正确例子：hasMissingFlag:1，hasMissingFlag=1|13
+值类型：integer
+
+O：全局资源[global_resource_NAME]
+
+O-1：stackHorizontal（堆叠水平）
+描述：定义与玩家所有单位共享的新资源，其工作方式类似于内置的资金。添加到"all-units.template"（位于mod根目录）
+正确例子：stackHorizontal:true
+值类型：boolean
+
+O-2：displayName（显示名称）
+描述：用户界面中此资源的名称
+正确例子：displayName:资金
+值类型：string
+
+O-3：displayNameShort（显示短名称）
+描述：在较小的UI上显示的文本（如action的悬浮文本）默认为displayName
+正确例子：displayNameShort:￥
+值类型：string
+
+O-4：hidden（隐藏）
+描述：向玩家隐藏此资源
+正确例子：hidden:true
+值类型：boolean
+
+O-5：priority（优先级）
+描述：如果多个mod单元中定义了同名的资源，则使用具有最高优先级的displayName/displayColor
+正确例子：priority:1
+值类型：float
+
+O-6：displayColor（显示颜色）
+描述：颜色，可以是十六进制，带有可选的alpha
+正确例子：displayColor:#FF0000
+值类型：color
+
+O-7：displayRoundedDown（显示为整数）
+描述：对资源进行舍入显示为整数。
+正确例子：displayRoundedDown:true
+值类型：boolean
+
+O-8：displayWhenZero（为零时显示）
+描述：资源为零时也显示。
+正确例子：displayWhenZero:true
+值类型：boolean
+
+O-9：iconImageUseInText（在动作(action)的描述中显示资源图标）
+描述：默认为true
+正确例子：iconImageUseInText:false
+值类型：boolean
+
+O-10：iconImage（图标）
+描述：自定义该资源的象征图像
+正确例子：iconImage:chemms.png
+值类型：file
+
+O-11：displayNameHideWhenIconShownInText（显示名称在文本中显示图标时隐藏）
+描述：(默认为false) - 有助于缩短说明文本
+正确例子：displayNameHideWhenIconShownInText:true
+值类型：boolean
+
+O-12：displayNameHideWhenIconShownInHUD（文本显示名称在HUD中显示图标时隐藏）
+描述：默认为false
+正确例子：displayNameHideWhenIconShownInHUD:true
+值类型：boolean
+
+O-13：displayColorUseInText（在动作(action)的描述中显示资源颜色）
+描述：默认为true
+正确例子：displayColorUseInText:false
+值类型：boolean
+
+O-14：appendResourceInHUD（在HUD中追加资源）
+描述：使用后，在游戏界面中这个资源值将会叠在目标资源值的后面，并且继承目标资源的颜色和图标。这个资源值后面也能继续叠加其它资源值
+正确例子：appendResourceInHUD:<resources:name>
+值类型：(global) resource code name
+
+O-15：displayPrefixInHUD（在HUD中显示前缀）
+描述：在资源数值前显示的文本，会替换掉资源原本的名称以及冒号，和appendResourceInHUD一同使用时可以用来显示资源限制之类的内容
+正确例子：displayPrefixInHUD:321
+值类型：string
+
+O-16：displayPostfixInHUD（在HUD中显示后缀）
+描述：在资源数值之后显示的文本
+正确例子：displayPostfixInHUD:123
+值类型：string
+
+O-17：displayTextAppendResourceWithGap（显示具有间隙的附加资源文本）
+描述：默认为false。将不相关的资源放在同一行时，在资源之间添加空格。
+正确例子：displayTextAppendResourceWithGap:true
+值类型：boolean
+
+O-18：appendResourceInHUD_whenThisZero（在此为零时在HUD中追加资源）
+描述：默认为true。为false时附加资源（如用于显示最大值的资源）与父资源一起隐藏。
+正确例子：appendResourceInHUD_whenThisZero:false
+值类型：boolean
+
+O-19：includeInStats（包括值）
+描述：包括该资源，与valueInStats类似
+正确例子：includeInStats:true
+值类型：boolean
+
+O-20：valueInStats（统计值）
+描述：(如果全局且未隐藏，则默认为 1(true)，否则默认为 0(false)） - 用于游戏后的统计和回放的排行榜
+正确例子：valueInStats:1
+值类型：float
+
+O-21：displayInHud（在HUD里显示）
+描述：- 用于 appendResourceInHUD（在HUD中追加资源） 中的资源，而不会隐藏它们，这有其他副作用
+正确例子：displayInHud:true
+值类型：boolean
+
+O-22：displayDigitGrouping（资源数字分组）
+描述：none/comma/space--(空,逗号,空格)(例如资源数量10000,空格分组就是10 000)
+正确例子：displayDigitGrouping:none
+值类型：enum
+
+O-23：displayTextAppendResource（显示文本里添加资源）
+描述：往文本里添加一个资源
+正确例子：displayTextAppendResource:<resource:name>
+值类型：(global) resource code name
+
+O-24：displayPos（显示排序）
+描述：显示优先级，越小越居上
+正确例子：displayPos:1
+值类型：integer
+
+O-25：displayWithRounding（四舍五入取整）
+描述：将资源的小数部分用四舍五入法变成整数，此代码为真后，该资源数字一定是整数
+正确例子：displayWithRounding:true
+值类型：boolean
+
+O-26：displayTextPrefix（显示文本前缀）
+描述：与displayPrefixInHUD有着相同的作用，而且它俩不能共存
+约束：不能与 displayPrefixInHUD 共存
+正确例子：displayTextPrefix:321
+值类型：string
+
+O-27：displayTextPostfix（显示文本后缀）
+描述：与displayPostfixInHUD有着相同的作用，而且它俩不能共存
+约束：不能与 displayPostfixInHUD 共存
+正确例子：displayTextPostfix:123
+值类型：string
+
+P：局部资源[resource_NAME]
+
+P-1：stackHorizontal（堆叠水平）
+描述：将此代码为真的资源统一排列到同一水平线上。
+正确例子：stackHorizontal:true
+值类型：boolean
+
+P-2：displayName（显示名称）
+描述：UI中此资源的名称(如悬停在单元信息上)
+正确例子：displayName:计数器
+值类型：string
+
+P-3：displayNameShort（显示短名称）
+描述：在较小的UI上显示的文本（如action的悬浮文本）默认为displayName
+正确例子：displayNameShort:s
+值类型：string
+
+P-4：hidden（隐藏）
+描述：对玩家隐藏这个资源
+正确例子：hidden:true
+值类型：boolean
+
+P-5：equivalentGlobalResourceForAI（作为AI的全局资源）
+描述：用于向AI提示具有本地资源的资源节点可用于获取不同的全局资源。例如，当一台收割机卸载资源
+正确例子：equivalentGlobalResourceForAI:gold,diamond
+值类型：(global) resource(s) code name
+
+P-6：displayRoundedDown（显示为整数）
+描述：对资源进行舍入显示为整数。
+正确例子：displayRoundedDown:true
+值类型：boolean
+
+P-7：iconImageUseInText（在动作(action)的描述中显示资源图标）
+描述：默认为true
+正确例子：iconImageUseInText:false
+值类型：boolean
+
+P-8：iconImage（图标）
+描述：自定义该资源的象征图像
+正确例子：iconImage:chemms.png
+值类型：file
+
+P-9：displayNameHideWhenIconShownInText（显示名称在文本中显示图标时隐藏）
+描述：(默认为false) - 有助于缩短说明文本
+正确例子：displayNameHideWhenIconShownInText:true
+值类型：boolean
+
+P-10：displayNameHideWhenIconShownInHUD（文本显示名称在HUD中显示图标时隐藏）
+描述：默认为false
+正确例子：displayNameHideWhenIconShownInHUD:true
+值类型：boolean
+
+P-11：displayColorUseInText（在动作(action)的描述中显示资源颜色）
+描述：默认为true
+正确例子：displayColorUseInText:false
+值类型：boolean
+
+P-12：appendResourceInHUD（在HUD中追加资源）
+描述：使用后，在游戏界面中这个资源值将会叠在目标资源值的后面，并且继承目标资源的颜色和图标。这个资源值后面也能继续叠加其它资源值
+正确例子：appendResourceInHUD:<resources:name>
+值类型：(global) resource code name
+
+P-13：displayPrefixInHUD（在HUD中显示前缀）
+描述：在资源数值前显示的文本，会替换掉资源原本的名称以及冒号，和appendResourceInHUD一同使用时可以用来显示资源限制之类的内容
+正确例子：displayPrefixInHUD:321
+值类型：string
+
+P-14：displayPostfixInHUD（在HUD中显示后缀）
+描述：在资源数值之后显示的文本
+正确例子：displayPostfixInHUD:123
+值类型：string
+
+P-15：displayTextAppendResourceWithGap（显示具有间隙的附加资源文本）
+描述：默认为false。将不相关的资源放在同一行时，在资源之间添加空格。
+正确例子：displayTextAppendResourceWithGap:true
+值类型：boolean
+
+P-16：appendResourceInHUD_whenThisZero（在此为零时在HUD中追加资源）
+描述：默认为true。为false时附加资源（如用于显示最大值的资源）与父资源一起隐藏。
+正确例子：appendResourceInHUD_whenThisZero:false
+值类型：boolean
+
+P-17：includeInStats（包括值）
+描述：包括该资源，与valueInStats类似
+正确例子：includeInStats:true
+值类型：boolean
+
+P-18：valueInStats（统计值）
+描述：(如果全局且未隐藏，则默认为 1(true)，否则默认为 0(false)） - 用于游戏后的统计和回放的排行榜
+正确例子：valueInStats:1
+值类型：float
+
+P-19：displayTextAppendResource（显示文本里添加资源）
+描述：在显示的UI中添加该资源
+正确例子：displayTextAppendResource:<resource:name>
+值类型：(global) resource code name
+
+P-20：displayDigitGrouping（资源数字分组）
+描述：none/comma/space--(空,逗号,空格)(例如资源数量10000,空格分组就是10 000)
+正确例子：displayDigitGrouping:none
+值类型：enum
+
+P-21：displayPos（显示排序）
+描述：显示优先级，越小越居上
+正确例子：displayPos:1
+值类型：integer
+
+P-22：displayWithRounding（四舍五入取整）
+描述：将资源的小数部分用四舍五入法变成整数，此代码为真后，该资源数字一定是整数
+正确例子：displayWithRounding:true
+值类型：boolean
+
+P-23：displayTextPrefix（显示文本前缀）
+描述：与displayPrefixInHUD有着相同的作用，而且它俩不能共存
+约束：不能与 displayPrefixInHUD 共存
+正确例子：displayTextPrefix:321
+值类型：string
+
+P-24：displayTextPostfix（显示文本后缀）
+描述：与displayPostfixInHUD有着相同的作用，而且它俩不能共存
+约束：不能与 displayPostfixInHUD 共存
+正确例子：displayTextPostfix:123
+值类型：string
+
+Q：贴图/贴花[decal_NAME]
+
+Q-1：layer（绘制图层）
+描述：可以填入的值：shadow(阴影), beforeBody(在主体之下), afterBody(在主体之上), onTop(在最顶端), beforeUI(在显示界面之下)，inactive(失活层)
+正确例子：layer:beforeUI
+值类型：enum
+
+Q-2：order（排序(默认为0并且按照ini里的顺序)）
+描述：Order with other decals, defaults 0 and uses order it appears in ini（使用其他贴花排序，默认为0，并使用其在ini中显示的顺序）
+正确例子：order:1
+值类型：float
+
+Q-3：onlyWhenSelectedByOwnPlayer（仅在被拥有者选中时绘制）
+描述：Only draw if the viewing player is the same as this unit.（只有当玩家查看本单位时，才可绘制贴花。）
+正确例子：onlyWhenSelectedByOwnPlayer:true
+值类型：boolean
+
+Q-4：onlyWhenSelectedByEnemyPlayer（被敌方玩家选中时绘制）
+描述：被敌方玩家选中时绘制
+正确例子：onlyWhenSelectedByEnemyPlayer:true
+值类型：boolean
+
+Q-5：onlyWhenSelectedByAllyNotOwnPlayer（非自身队伍的盟友选中时绘制）
+描述：非自身队伍的盟友选中时绘制
+正确例子：onlyWhenSelectedByAllyNotOwnPlayer:false
+值类型：boolean
+
+Q-6：onlyWhenSelectedByAnyPlayer（被任意玩家选中时绘制）
+描述：Show when any player selects this unit.（在任何玩家选中本单位值绘制贴花）
+正确例子：onlyWhenSelectedByAnyPlayer:false
+值类型：boolean
+
+Q-7：includeParentsSelection（包括被父单位选中）
+描述：onlyWhenSelected*also check parents selection（仅当选定时*还检查父项选择）
+正确例子：includeParentsSelection:true
+值类型：boolean
+
+Q-8：onlyPlayersWithUnitControl（仅在查看者能够控制此单位时绘制）
+描述：Only draw if viewing player could control this unit（仅当观看者可以控制此单元时才绘制贴花）
+正确例子：onlyPlayersWithUnitControl:false
+值类型：boolean
+
+Q-9：onlyTeam（仅在查看者为特定队伍时显示）
+描述：Only draw when this relation between unit and viewing player，Can be filled in:own|notOwn|neutral|allyNotOwn|ally|enemy|any (仅当单位和查看玩家之间的关系时绘制，可以填写：己方|非己方|中立方|除自己外盟友|盟友|敌方|任意)
+正确例子：onlyTeam:any
+值类型：enum
+
+Q-10：onlyWithZoomLevelOrMore（仅当缩放到当前大小或更大时绘制）
+描述：onscreen. Recommended to be set on decals for 3d voxel style units, small details or small shadows.Would hide decal when zoomed out a bit. Useful to reduce draw calls for performance when a lot of units might be；（屏幕上。建议设置在三维立体体积元素样式单位、小细节或小阴影的贴花上。缩小一点时会隐藏贴花。当许多单元可能需要时，有助于减少性能的调用）
+正确例子：onlyWithZoomLevelOrMore:2.5
+值类型：float
+
+Q-11：onlyWhileActive（仅在单位建造完成时绘制）
+描述：Only draw when unit has been completed（仅在单位完成时绘制，比如建造者建造一般的建筑就不算)
+正确例子：onlyWhileActive:true
+值类型：boolean
+
+Q-12：onlyOnBodyFrameOf（只在主体关键帧时绘制）
+描述：只有在主体到某个关键帧时绘制
+正确例子：onlyOnBodyFrameOf:1
+值类型：integer
+
+Q-13：onlyWhileAlive（仅在存活时绘制）
+描述：(If beforeUI layer default true, else default false)(如果图层(layer)为beforeUI默认为true,否则false，为ture死后消失)
+正确例子：onlyWhileActive:false
+值类型：boolean
+
+Q-14：onlyInPreview（仅在侧边栏和建筑放置预览中显示）
+描述：Only show in sidebar, and building placement preview（仅在侧边栏中显示，以及建筑布局预览）
+正确例子：onlyInPreview:true
+值类型：boolean
+
+Q-15：onlyOnNonPreview（仅在非预览中显示(与上一条相反)）
+描述：Only show on real unit, not action sidebar, etc（仅在真实单元上显示，而不是动作侧边栏等）
+正确例子：onlyOnNonPreview:true
+值类型：boolean
+
+Q-16：imageScale（图像缩放(倍数)）
+描述：图像缩放(倍数)
+正确例子：imageScale:self.hp
+值类型：LogicNumber
+
+Q-17：imageScaleX（图像X缩放）
+描述：图像X缩放
+正确例子：imageScaleX:self.shield
+值类型：LogicNumber
+
+Q-18：imageScaleY（图像Y缩放）
+描述：图像Y缩放
+正确例子：imageScaleY:self.energy
+值类型：LogicNumber
+
+Q-19：image（图像）
+描述：图像
+正确例子：image:XXX.png
+值类型：file
+
+Q-20：teamColors（阵营色）
+描述：bool. Enable team coloring on image and imageStack（布尔值。在图像和图像堆栈上启用队伍色）
+正确例子：teamColors:true
+值类型：boolean
+
+Q-21：imageStack（图像堆栈）
+描述：list of images recommended for 3d voxel style units as images can be batch drawn when using the same sprite sheet.（推荐用于三维立体体积元素样式单位的图像列表，因为当使用相同的子画面时，可以批量绘制图像。）(目前没有实例所以不清楚,但确定是用于3d单位)；支持在图像后添加数量声明，例如 imageStack:body.png*100。
+正确例子：imageStack:XXX.png
+值类型：file
+
+Q-22：stack_hOffset（列表图像高度偏移）
+描述：for 3d voxel style units.（用于三维立体体积元素样式单位。）
+正确例子：stack_hOffset:1
+值类型：float
+
+Q-23：stack_frameOffset（列表图像帧偏移）
+描述：for 3d voxel style units.（用于三维立体体积元素样式单位。）
+正确例子：stack_frameOffset:2
+值类型：integer
+
+Q-24：stack_drawInReverseOrder（列表图像绘图顺序）
+描述：是否反向绘制 imageStack。未填写时，stack_hOffset 为负数也会触发反向绘制。
+正确例子：stack_drawInReverseOrder:true
+值类型：boolean
+
+Q-25：stack_indexStart（列表图像起始图像）
+描述：logic int (Starting image of the image stack)（动态整数（图像堆栈的起始图像））
+正确例子：stack_indexStart:self.x
+值类型：LogicNumber
+
+Q-26：stack_indexCount（列表图像数量）
+描述：logic int (Number of images to draw. Could be set to 1 to use stack_indexStart as an image picker)（动态整数（要绘制的图像数。可以设置为1以使用堆栈索引开始作为图像选择器））
+正确例子：stack_indexCount:self.y
+值类型：LogicNumber
+
+Q-27：total_frames（总帧数(跟后面两个二选一使用)）
+描述：Use total_frames or frame_width/frame_height（使用 总帧数 或者 帧宽度/帧高度）
+正确例子：total_frames:12
+值类型：integer
+
+Q-28：frame_verticalOrdering（帧清单）
+描述：是否列出帧清单
+正确例子：frame_verticalOrdering:true
+值类型：boolean
+
+Q-29：frame_width（帧宽度）
+描述：帧宽度（不可与总帧数一起设置）
+正确例子：frame_width:2
+值类型：integer
+
+Q-30：frame_height（帧高度）
+描述：帧高度
+正确例子：frame_height:2
+值类型：integer
+
+Q-31：frame（帧）
+描述：(与total_frames相比,frame是动值,可以改变内存来修改第几帧)
+正确例子：frame:self.maxHp
+值类型：LogicNumber
+
+Q-32：addBodyFrameMultipliedBy（添加主体帧乘数）
+描述：添加主体帧时的乘数
+正确例子：addBodyFrameMultipliedBy:1.2
+值类型：float
+
+Q-33：isVisible（可见）
+描述：表明该帖花是否可以被我们看见(可以使用逻辑)
+正确例子：isVisible:if self.isMoving
+值类型：Logicbooleanean
+
+Q-34：xOffsetRelative（X相对偏移）
+描述：(note use basePosition with createMarker/etc for logic use)（请注意，动态使用base Position（基本位置）和create Marker（创建标记）/ect（等））
+正确例子：xOffsetRelative:200
+值类型：float
+
+Q-35：yOffsetRelative（Y相对偏移）
+描述：(note use basePosition with createMarker/etc for logic use)（请注意，动态使用base Position（基本位置）和create Marker（创建标记）/ect（等））
+正确例子：yOffsetRelative:200
+值类型：float
+
+Q-36：xOffsetAbsolute（X绝对偏移）
+描述：(note use basePosition with createMarker/etc for logic use)（请注意，动态使用base Position（基本位置）和create Marker（创建标记）/ect（等））
+正确例子：xOffsetAbsolute:self.hp
+值类型：LogicNumber
+
+Q-37：yOffsetAbsolute（Y绝对偏移）
+描述：(note use basePosition with createMarker/etc for logic use)（请注意，动态使用base Position（基本位置）和create Marker（创建标记）/ect（等））
+正确例子：yOffsetAbsolute:self.hp
+值类型：LogicNumber
+
+Q-38：hOffset（高度偏移）
+描述：height offset（高度偏移）
+正确例子：hOffset:2
+值类型：float
+
+Q-39：dirOffset（角度偏移）
+描述：角度偏移
+正确例子：dirOffset:25
+值类型：float
+
+Q-40：pivotOffset（坐标系旋转）
+描述：(相当于把单位定位的直角坐标系旋转该角度,然后重新确定xy) 只影响X/Y相对偏移,不旋转图像-----only effects xOffsetRelative/yOffsetRelative without rotating image
+正确例子：pivotOffset:125
+值类型：float
+
+Q-41：alwaysStartDirAtZero（总是固定角度为零(总是朝上)）
+描述：Useful for UI(对UI有用)
+正确例子：alwaysStartDirAtZero:true
+值类型：boolean
+
+Q-42：alwayStartDirAtZero（总是角度为零(总是朝上)）
+描述：Useful for UI(对UI有用)
+正确例子：alwayStartDirAtZero:true
+值类型：boolean
+
+Q-43：alwaysStartHeightAtZero（总是固定高度为零）
+描述：Useful for UI on air and hover units（对空中和两栖单位的UI有用）
+正确例子：alwaysStartHeightAtZero:false
+值类型：boolean
+
+Q-44：basePosition（中心位置(填单位参考)）
+描述：unit or marker to draw from as the base（作为基础绘制的单位或标记）
+正确例子：basePosition:nearestUnit
+值类型：unit ref
+
+Q-45：basePositionFromLeg（以脚为中心位置）
+描述：Use a leg/arm position instead of unit body as base（使用 腿/脚 位置而不是单位身体作为基础）
+正确例子：basePositionFromLeg:1
+值类型：leg code name
+
+Q-46：basePositionFromTurret（以炮塔为中心位置）
+描述：Use a turret position instead of unit body as base（使用炮塔位置而不是单元主体作为底座）
+正确例子：basePositionFromTurret:5
+值类型：turret code name
+
+Q-47：basePositionFromLegEnd（以腿为中心位置）
+描述：填腿脚/胳膊节
+正确例子：basePositionFromLegEnd:leg_1
+值类型：leg/arm code name
+
+Q-48：drawLineTo（绘制线条到(受到颜色和宽度影响)）
+描述：Draws a line to this location affected by color and width（在此位置绘制一条受颜色和宽度影响的线）
+正确例子：drawLineTo:nearestUnit
+值类型：unit ref
+
+Q-49：image_shadow（阴影图像）
+描述：阴影图像
+正确例子：image_shadow:XXX.png
+值类型：file
+
+Q-50：shadowOffsetX（阴影偏移X）
+描述：阴影偏移X
+正确例子：shadowOffsetX:12
+值类型：float
+
+Q-51：shadowOffsetY（阴影偏移Y）
+描述：阴影偏移Y
+正确例子：shadowOffsetY:21
+值类型：float
+
+Q-52：color（颜色(影像图像和线条)）
+描述：affects image and line.（影响图像和线条。）
+正确例子：color:#acefdb
+值类型：color
+
+Q-53：alpha（不透明度(影像颜色和线条)）
+描述：LogicFloat (0-1). Stacks with alpha in color. affects image and line.（动态浮点值（0-1）。以颜色堆叠透明度。影响图像和线条。）
+正确例子：alpha:self.shield
+值类型：LogicNumber
+
+Q-54：lineWidth（线宽度）
+描述：表明这条线的宽度
+正确例子：lineWidth:21.564
+值类型：float
+
+R：模板[template_NAME]
+
+R-1：@copyFromSection（复制节）
+描述：模板部分可以具有任何键，并且其自身无效。；可以使用[core]copyFrom从其他文件中引用模板。例如：[core]copyFrom:ROOT:effects/explodeEffects.template。copyFrom可以一次引用多个文件。；-以下所有这些功能都可以与任何部分一起使用，而不仅仅是模板-；在任何节中使用，以引用节或模板的代码。如@copyFromSection template_name/action_name/projectile_name
+正确例子：@copyFromSection:projectile_1
+
+R-2：@copyFrom_skipThisSection（复制但跳过节）
+描述：在任何节中使用，例如，在引用时候不复制某个action.
+正确例子：[action_test]；@copyFrom_skipThisSection:true
+
+R-3：@define X（局部变量）
+描述：在一个节中定义一个局部变量(最好在模板外部)
+约束：禁止变量套娃引用；变量名称禁止包含字符：=，}，$，.，{，-，+，:，(；变量名称禁止以数字开头
+正确例子：@define targetEffect: boom
+错误例子：@define a:${b}
+
+R-4：@global X（全局变量）
+描述：定义在所有节中使用的全局变量。注意：局部变量具有更高的优先级
+约束：禁止变量套娃引用；变量名称禁止包含字符：=，}，$，.，{，-，+，:，(；变量名称禁止以数字开头
+正确例子：@global targetEffect: pop
+错误例子：@global a:${b}
+
+R-5：${X}（变量引用）
+描述：该方法用于引用section中@define或者@global定义的变量的值，可以作为代码插入使用，运算符和数学方法的使用请在代码表logic区中背景颜色为肉色或紫色处查看
+约束：它是唯二支持 ^ 运算符的区域；在代码里有引用上限
+正确例子：spawnEffects:effect_${targetEffect}
+
+R-6：${section.key}（值引用）
+描述：该方法用于引用指定section下的key所填的值，可以作为代码插入使用，运算符和数学方法的使用请在代码表logic区中背景颜色为肉色或紫色处查看，冷知识请跳转“其他”工作簿第二栏目底部寻找
+约束：它是唯二支持 ^ 运算符的区域；在代码里有引用上限
+正确例子：addResources:credits=${core.price * 2 + 10}
+
+R-7：%{X}（%{X}）
+描述：可用于将动态逻辑添加到某些字符串中（此方式只能用于字符串(mod-info.txt的除外)）。 该值将每一帧更新。；[action]text: Missing hp %{self.maxHp - self.hp}
+
+R-8："""[文本]"""（多行代码；多行注释）
+描述：可用于多行字符填写。 从最终结果中删除换行符。ini文件任意地方均可使用。但需注意，您在打了一个"""后，必须要有一个"""与之对应，否则一定报错，不能用'''，否则也报错；"""在位于最行首时，作用将会改为多行注释
+约束：三引号必须成对闭合；不能使用 ''' 代替 """
+正确例子：copyFrom:"""；ROOT:a.ini,；ROOT:b.ini,；ROOT:c.ini；"""；"""；这是一个多行注释；233；233；233；233；"""（这里也可以是一个注释）
+错误例子：copyFrom:"""（未闭合）；copyFrom:'''ROOT:a.ini'''
+
+R-9：IGNORE（忽略（必须大写））
+描述：一个特殊的值，所有代码均可填写，填写后什么都不会发生，一般用于section之间的复制，即忽略该代码的复制
+正确例子：[hiddenAction_ok]；spawnUnits:IGNORE；requireConditional:IGNORE；autoTrigger:IGNORE
+
+S：注释[comment_NAME]
+S-a：未分类、S-b：特殊单位
+
+S-a：未分类
+分类说明：注释部分可以有任何键，但没有效果。
+
+S-a-1：游戏默认声音列表(用于炮塔开火声或其他音效参考)
+描述：bug_attack, bug_die, building_explode, cannon_firing, click, click_add, click_remove, firing3, firing4, gun_fire, interface_error, large_gun_fire1, large_gun_fire2, laser_deflect, laser_deflect2, lighting_burst, message, missile_fire, missile_hit, move, nuke_explode, nuke_launch, plasma_fire, plasma_fire2, tank_firing, unit_explode, unit_explode_old, warning
+正确例子：这是luke加上的，更多内置效果、内部参数我在"参数表"内列出。
+
+S-b：特殊单位
+
+S-b-1：damagingBorder（伤害边界）
+描述：此内部单位会生成一个圆形的安全区域，所有区域外的单位会不断收到伤害直到死亡。
+正确例子：spawnUnits:damagingBorder(techLevel=4,offsetRandomX=1,offsetRandomY=1)
+
+S-b-2：zonemarker（预备伤害边界）
+描述：此单位用于指示伤害边框移动到何处，是放大还是缩小，可使用“techLevel”控制大小。
+正确例子：spawnUnits:zonemarker(techLevel=2,offsetRandomX=1,offsetRandomY=1)
+
+S-b-3：setRally（设置集结点）
+描述：用于设置建造完成的单位的集结点，而不是建筑门口
+正确例子：canBuild_1_name:setRally；canBuild_1_pos:1
+
+S-b-4：reclaim（回收）
+描述：回收建筑并返还75%资金
+正确例子：canBuild_1_name:reclaim；canBuild_1_pos:1
+
+S-b-5：repair（维修）
+描述：主动维修建筑
+正确例子：canBuild_1_name:repair；canBuild_1_pos:1
+
+T：模组[mod]
+
+T-1：title（标题）
+描述：模组标题，会显示到加载页面里面，代表模组的名称
+正确例子：title:模组名称
+值类型：string
+
+T-2：description（描述）
+描述：对于的模组描述
+正确例子：description:模组描述
+值类型：string
+
+T-3：tags（标签）
+描述：模组标签，方便和其他模组进行区分（给steam用的）
+正确例子：tags:模组,自制,肉鸽(?)
+值类型：string(s)
+
+T-4：minVersion（最低版本）
+描述：告诉你该模组支持的最低版本，decal为1.15p9，数组为1.15p11，但凡这两个没有在minVersion后面写上相应版本，一定会报错
+约束：若使用 decal（>=1.15p9）或数组（>=1.15p11）能力，minVersion 必须声明对应最低版本
+正确例子：minVersion:v1.15
+错误例子：minVersion:v1.14（当模组使用 decal/数组能力时）
+值类型：string
+
+T-5：thumbnail（略图）
+描述：模组略图，在游戏里不会显示，因为这个是给steam用的
+正确例子：thumbnail:xxx.png
+值类型：file
+
+U：音乐[music]
+
+U-1：sourceFolder（源文件夹）
+描述：填文件夹路径，游戏将会播放此文件夹内的音乐（仅支持.ogg或.wav）
+正确例子：sourceFolder:music/background\
+值类型：path
+
+U-2：whenUsingUnitsFromThisMod_playExclusively（当使用本模组时强制播放）
+描述：使用该代码，游戏将仅播放这个文件夹内的ogg音频（手机端只要是音频就能播放）
+正确例子：whenUsingUnitsFromThisMod_playExclusively:true
+值类型：boolean
+
+U-3：addToNormalPlaylist（将音乐添加至默认播放列表）
+描述：使用该代码，游戏的音乐播放列表将添加所填的目录下的ogg音频（手机端只要是音频就能播放）
+正确例子：addToNormalPlaylist:true
+值类型：boolean

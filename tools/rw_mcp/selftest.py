@@ -1,0 +1,163 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""rw_mcp 自检。全只读。
+
+    python tools/rw_mcp/selftest.py            # 直接调用 impl（不需要装 mcp SDK）
+    python tools/rw_mcp/selftest.py --stdio    # 起真实 stdio 服务，走 MCP 协议
+    python tools/rw_mcp/selftest.py --time     # 冷启动计时
+"""
+
+import argparse
+import asyncio
+import os
+import sys
+import time
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+TOOLS = os.path.dirname(HERE)
+if TOOLS not in sys.path:
+    sys.path.insert(0, TOOLS)
+
+from rw_mcp import impl, dataset  # noqa: E402
+
+PASS, FAIL = 0, 0
+
+
+def check(name, cond, detail=""):
+    global PASS, FAIL
+    if cond:
+        PASS += 1
+        print("  PASS  %s" % name)
+    else:
+        FAIL += 1
+        print("  FAIL  %s %s" % (name, detail))
+
+
+def run_direct():
+    print("== 直接调用 impl ==")
+    info = dataset.describe()
+    print("  数据源：CSV=%s 键 / 中文表=%s 键 / 二进制=%s 键"
+          % (info["counts"]["csv_rows"], info["counts"]["cn_entries"], info["counts"]["jar_keys"]))
+    print("  root=%s" % info["root"])
+
+    r = impl.lookup_key("canAttack")
+    check("lookup_key(canAttack) 找到", r.get("found") is True, r)
+    check("  → 规范拼写正确", r.get("key") == "canAttack", r.get("key"))
+    check("  → 归属 D 章(attack)", any(s["letter"] == "D" for s in r.get("sections", [])), r.get("sections"))
+    check("  → 三个数据源都有", all(r.get("sources", {}).values()), r.get("sources"))
+
+    r = impl.lookup_key("canattack")
+    check("lookup_key(canattack) 大小写归一", r.get("match") in ("case", "normalized"), r.get("match"))
+
+    r = impl.lookup_key("canAtack")
+    check("lookup_key(canAtack) 未找到但有建议",
+          r.get("found") is False and any(s["key"].lower() == "canattack" for s in r.get("suggestions", [])),
+          r.get("suggestions"))
+
+    r = impl.lookup_key("layer")
+    check("lookup_key(layer) 归属 Q 章(decal)",
+          any(s["letter"] == "Q" for s in r.get("sections", [])), r.get("sections"))
+    check("  → 版本含 1.15p9", "1.15p9" in (r.get("versions") or []), r.get("versions"))
+
+    r = impl.lookup_key("isVisible")
+    check("lookup_key(isVisible) 多条中文释义", len(r.get("cn") or []) >= 4, len(r.get("cn") or []))
+
+    r = impl.lookup_key("displayText")
+    check("lookup_key(displayText) 命中占位符别名", bool(r.get("cn")), r.get("cn"))
+
+    r = impl.search_source("addBooleanType")
+    check("search_source(addBooleanType) 有命中", r.get("total_matches", 0) >= 1, r.get("total_matches"))
+    check("  → 每条都有 file/line/text",
+          all(m.get("file") and m.get("line") and m.get("text") is not None for m in r.get("matches", [])))
+
+    r = impl.search_source("autoTriggerOnEvent", path_filter="custom/")
+    check("search_source 路径过滤生效", r.get("files_scanned", 0) < 1698, r.get("files_scanned"))
+
+    r = impl.search_source("(", regex=True)
+    check("search_source 非法正则返回 ok:false 不崩", r.get("ok") is False, r)
+
+    r = impl.get_ref()
+    check("get_ref 事件 18 个", len(r.get("events", [])) == 18, len(r.get("events", [])))
+    check("get_ref 函数 27 个", len(r.get("functions", [])) == 27, len(r.get("functions", [])))
+    check("get_ref 配对规则 4 条", len(r.get("rules", {}).get("must_pair", [])) == 4)
+
+    r = impl.lint("Kings of Cards")
+    check("lint(Kings of Cards) 通过", r.get("ok") is True, r.get("error"))
+    check("  → 15 文件 / 0 错误 / 16 警告",
+          (r.get("files"), r.get("errors"), r.get("warnings")) == (15, 0, 16),
+          (r.get("files"), r.get("errors"), r.get("warnings")))
+
+    r = impl.lint("示例")
+    check("lint(示例) 5 个文件", r.get("ok") is True and r.get("files") == 5, r.get("files"))
+
+    r = impl.lint("no-such-dir-xyz")
+    check("lint(不存在路径) 返回 ok:false", r.get("ok") is False and "路径" in (r.get("error") or ""), r)
+
+    t0 = time.time()
+    impl.search_source("addBooleanType")
+    warm = (time.time() - t0) * 1000
+    check("search_source 全树扫描 < 800ms", warm < 800, "%.0fms" % warm)
+
+
+async def run_stdio():
+    print("== stdio 协议测试 ==")
+    try:
+        from mcp import ClientSession, StdioServerParameters
+        from mcp.client.stdio import stdio_client
+    except ImportError as e:
+        print("  SKIP  没装 mcp SDK：%s" % e)
+        return
+
+    server = os.path.join(TOOLS, "rw_mcp_server.py")
+    params = StdioServerParameters(
+        command=sys.executable, args=[server],
+        env={**os.environ, "PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8"})
+
+    async with stdio_client(params) as (r, w):
+        async with ClientSession(r, w) as s:
+            await s.initialize()
+            tools = await s.list_tools()
+            names = [t.name for t in tools.tools]
+            check("恰好 4 个工具", len(names) == 4, names)
+            check("工具名齐全",
+                  set(names) == {"lookup_key", "search_source", "get_ref", "lint"}, names)
+
+            for name, args in (("lookup_key", {"key": "layer"}),
+                               ("search_source", {"pattern": "addBooleanType", "max_results": 3}),
+                               ("get_ref", {}),
+                               ("lint", {"path": "示例"})):
+                res = await s.call_tool(name, args)
+                ok = bool(res.content)
+                check("调用 %s 成功" % name, ok, str(res.content)[:120])
+
+
+def run_time():
+    print("== 冷启动计时 ==")
+    t0 = time.time(); dataset.get_dataset(); t1 = time.time()
+    print("  dataset 构建：%.0f ms" % ((t1 - t0) * 1000))
+    t0 = time.time(); dataset.get_java_lines(); t1 = time.time()
+    print("  Java 索引构建：%.0f ms（1,698 个文件）" % ((t1 - t0) * 1000))
+    t0 = time.time(); impl.get_ref(); t1 = time.time()
+    print("  get_ref：%.1f ms" % ((t1 - t0) * 1000))
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--stdio", action="store_true", help="起真实服务走 MCP 协议")
+    ap.add_argument("--time", action="store_true", help="冷启动计时")
+    a = ap.parse_args()
+
+    if a.time:
+        run_time()
+        return 0
+    if a.stdio:
+        asyncio.run(run_stdio())
+    else:
+        run_direct()
+
+    print("\n%d PASS / %d FAIL" % (PASS, FAIL))
+    return 0 if FAIL == 0 else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())
