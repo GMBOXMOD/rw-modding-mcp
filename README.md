@@ -1,5 +1,7 @@
 # 铁锈战争模组 MCP
 
+`https://github.com/GMBOXMOD/rw-modding-mcp`
+
 给 AI 助手用的《铁锈战争》(Rusted Warfare) 模组开发工具集，通过 [MCP](https://modelcontextprotocol.io) 暴露四个**只读**工具，让助手不用每次翻文档、翻反编译源码就能回答"这个键怎么用"。
 
 ## 四个工具
@@ -16,7 +18,7 @@
 ## 快速开始
 
 ```bash
-git clone <本仓库>
+git clone https://github.com/GMBOXMOD/rw-modding-mcp.git
 cd rw-modding-mcp
 python bootstrap.py --check     # 看环境缺什么
 ```
