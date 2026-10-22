@@ -50,6 +50,22 @@ GAME_CANDIDATES = [
 
 # ---------------------------------------------------------------- 输出
 
+def _force_stdout_utf8():
+    """只有 --check 这类纯命令行模式才动 stdout —— 启动服务时 stdout 是 MCP 协议通道。"""
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
+
+def _force_stderr_utf8():
+    """bootstrap 只往 stderr 写中文。**不要动 stdout** —— 那是 MCP 协议通道。"""
+    try:
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
+
 def _say(msg, quiet=False):
     """诊断信息一律走 stderr —— stdout 留给 MCP 协议。"""
     if not quiet:
@@ -244,6 +260,7 @@ def do_decompile(game, quiet=False, force=False):
 
 def cmd_check(args):
     """--check 模式：输出给人看的状态表（此时不是 MCP 模式，可以用 stdout）。"""
+    _force_stdout_utf8()
     py = venv_python()
     st = data_status()
     game = find_game(args.game)
@@ -276,6 +293,7 @@ def cmd_check(args):
 # ---------------------------------------------------------------- 主流程
 
 def main():
+    _force_stderr_utf8()
     ap = argparse.ArgumentParser(
         description="铁锈战争模组 MCP 通用启动器",
         formatter_class=argparse.RawDescriptionHelpFormatter)

@@ -1221,7 +1221,18 @@ def run_lint(target, csv_path=None, cn_path=None, jar_path=None):
 
 
 # ---------------------------------------------------------------- main
+def _force_utf8():
+    """Windows 上默认 stdout 是 ANSI 代码页，打印中文会 UnicodeEncodeError。
+    只在 CLI 入口调用 —— 模块级调用会干扰 MCP 服务端的 stdout 协议通道。"""
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+
+
 def main():
+    _force_utf8()
     ap = argparse.ArgumentParser(description="铁锈战争模组写后验证")
     ap.add_argument("target", nargs="?", help="要检查的文件或目录（用 --ref 时可省略）")
     ap.add_argument("--csv", default=None, help="官方代码表 CSV")

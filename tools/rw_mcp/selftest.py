@@ -229,7 +229,18 @@ def run_time():
     print("  get_ref：%.1f ms" % ((t1 - t0) * 1000))
 
 
+def _force_utf8():
+    """Windows 上默认 stdout 是 ANSI 代码页（en-US 是 cp1252），
+    打印中文会 UnicodeEncodeError。CI 的 windows-latest 就是这样挂的。"""
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+
+
 def main():
+    _force_utf8()
     ap = argparse.ArgumentParser()
     ap.add_argument("--stdio", action="store_true", help="起真实服务走 MCP 协议")
     ap.add_argument("--time", action="store_true", help="冷启动计时")

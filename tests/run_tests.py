@@ -84,7 +84,18 @@ def check_workflows():
     return ok, bad
 
 
+def _force_utf8():
+    """Windows 上默认 stdout 是 ANSI 代码页（en-US 是 cp1252），
+    打印中文会 UnicodeEncodeError。CI 的 windows-latest 就是这样挂的。"""
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+
+
 def main():
+    _force_utf8()
     verbose = "-v" in sys.argv
     passed = failed = 0
     print("坏样本回归测试\n")
