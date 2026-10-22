@@ -50,6 +50,40 @@ def codes_of(path):
     return {i.code for i in res["issues"]}, None
 
 
+def check_workflows():
+    """校验 .github/workflows/*.yml 能被 YAML 解析。
+
+    踩过一次：`run: python -m pip install --only-binary :all: mcp` 里
+    `: ` 是 YAML 的映射指示符，整个工作流解析失败。GitHub 只会说
+    "run failed" 并且 **0 个 job**，本地完全看不出问题。
+    """
+    wf_dir = os.path.join(ROOT, ".github", "workflows")
+    if not os.path.isdir(wf_dir):
+        return 0, 0
+    try:
+        import yaml
+    except ImportError:
+        print("  SKIP  工作流 YAML 校验（没装 pyyaml，pip install pyyaml 可启用）")
+        return 0, 0
+
+    ok = bad = 0
+    for fn in sorted(os.listdir(wf_dir)):
+        if not fn.endswith((".yml", ".yaml")):
+            continue
+        path = os.path.join(wf_dir, fn)
+        try:
+            d = yaml.safe_load(io.open(path, encoding="utf-8").read())
+            if not isinstance(d, dict) or "jobs" not in d:
+                raise ValueError("缺少 jobs 段")
+            print("  PASS  %-28s 工作流 YAML 合法（jobs: %s）"
+                  % (fn, ", ".join(d["jobs"])))
+            ok += 1
+        except Exception as e:                              # noqa: BLE001
+            print("  FAIL  %-28s 工作流 YAML 非法：%s" % (fn, e))
+            bad += 1
+    return ok, bad
+
+
 def main():
     verbose = "-v" in sys.argv
     passed = failed = 0
@@ -86,6 +120,11 @@ def main():
 
         if verbose:
             print("        实际命中：%s" % sorted(got))
+
+    print("\n-- 工作流 --")
+    w_ok, w_bad = check_workflows()
+    passed += w_ok
+    failed += w_bad
 
     print("\n%d PASS / %d FAIL" % (passed, failed))
     return 0 if failed == 0 else 1

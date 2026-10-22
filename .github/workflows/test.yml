@@ -14,7 +14,12 @@ jobs:
         with:
           python-version: "3.12"
 
+      # pyyaml 只用来校验工作流文件本身（踩过 YAML 解析失败的坑）
+      - name: 安装 pyyaml
+        run: "python -m pip install pyyaml"
+
       # 每个 fixture 都是故意写错的配置，断言精确的规则集合（多报/漏报都算失败）
+      # 同时校验 .github/workflows/*.yml 能被解析
       - name: 坏样本回归
         run: python tests/run_tests.py
 
@@ -28,7 +33,7 @@ jobs:
           python-version: "3.12"
 
       - name: 安装 mcp SDK
-        run: python -m pip install --only-binary :all: mcp
+        run: "python -m pip install --only-binary :all: mcp"
 
       # 直接调用四个工具（没有 game-lib.jar / 反编译产物时会自动 SKIP 对应项）
       - name: 工具自检
