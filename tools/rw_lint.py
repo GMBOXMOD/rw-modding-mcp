@@ -62,6 +62,85 @@ import csv
 import json
 import argparse
 
+# 引擎按**前缀**动态消费的键族。
+# 反编译确认：ag.java 里 `for (String s : ab2.e("animation_"))`、
+# bh.java 里 `ab2.k(string2, "mutator")` —— 这些键名不是固定字面量，
+# 代码表里也查不到具体拼写，按前缀整族放行。
+KEY_PREFIX_FAMILIES = (
+    "animation_", "mutator",
+    # 动画部件名：f.java 里是 string3.startsWith("body") 这种判断，
+    # 所以 body_0s / leg_1_3 之类的具体拼写不会出现在代码表里。
+    # 带下划线是为了不误吞 turretRange 这类真键。
+    "body_", "leg_", "arm_", "turret_",
+)
+
+# 中文表里带占位符的模板键，例如 builtFrom_#_name、action_#_[actionKey]
+CN_TEMPLATE_RX = re.compile(r"^[A-U]-(?:[a-z]+-)?\d*：([A-Za-z_@][^（(]*#[^（(]*)[（(]")
+
+
+def _template_to_rx(tpl):
+    """把模板键转成正则：`#` -> 序号，`[xxx]` -> 任意名字。"""
+    parts = []
+    i = 0
+    for m in re.finditer(r"#|\[[^\]]*\]", tpl):
+        parts.append(re.escape(tpl[i:m.start()]))
+        parts.append(r"\d+" if m.group(0) == "#" else r".+")
+        i = m.end()
+    parts.append(re.escape(tpl[i:]))
+    return re.compile("^" + "".join(parts) + "$", re.IGNORECASE)
+
+
+def load_key_templates(path):
+    """中文表 -> 模板键的正则列表。
+
+    例：builtFrom_#_name -> ^builtfrom_数字+_name$
+    带占位符的键在代码表里只有模板形式，具体拼写（builtFrom_1_name）查不到，
+    所以必须靠模板匹配，否则会被当成未知键。
+    """
+    out = []
+    if not path or not os.path.isfile(path):
+        return out
+    seen = set()
+    with io.open(path, encoding="utf-8", errors="replace") as fh:
+        lines = fh.read().splitlines()
+    for line in lines:
+        m = CN_TEMPLATE_RX.match(line.strip())
+        if not m:
+            continue
+        tpl = m.group(1).strip()
+        if tpl in seen:
+            continue
+        seen.add(tpl)
+        try:
+            out.append(_template_to_rx(tpl))
+        except re.error:
+            continue
+    return out
+
+
+def load_text_keys(path):
+    """一行一个键名的补充表（小写，忽略 # 注释行）。
+
+    用来补代码表没收录的键 —— 从 game-lib.jar 常量池导出的那份就是。
+    """
+    if not path or not os.path.isfile(path):
+        return set()
+    with io.open(path, encoding="utf-8", errors="replace") as fh:
+        return {ln.strip().lower() for ln in fh
+                if ln.strip() and not ln.lstrip().startswith("#")}
+
+
+def is_family_key(key_lower, templates):
+    """这个键是不是属于某个动态键族（前缀族或模板族）。"""
+    for p in KEY_PREFIX_FAMILIES:
+        if key_lower.startswith(p) and len(key_lower) > len(p):
+            return True
+    for rx in templates or ():
+        if rx.match(key_lower):
+            return True
+    return False
+
+
 # ---------------------------------------------------------------- 常量
 
 # 不需要当成"键"来校验的指令行前缀
@@ -464,7 +543,8 @@ def parse_file(path):
 
 def check_file(path, known, csv_keys, min_version, all_sections, mod_root,
                global_defines=frozenset(), referenced=frozenset(), canon=None,
-               unit_names=frozenset(), key_families=None, has_units_template=False):
+               unit_names=frozenset(), key_families=None, has_units_template=False,
+               key_templates=()):
     issues = []
     sections, entries, lines, raw, directives, defines = parse_file(path)
 
@@ -559,6 +639,9 @@ def check_file(path, known, csv_keys, min_version, all_sections, mod_root,
             if official and official != key:
                 issues.append(Issue("error", "01", path, ln,
                                     f"键名大小写错误：`{key}`，应为 `{official}`"))
+            continue
+        # 动态键族（animation_* / mutator* / builtFrom_#_name …）直接放行
+        if is_family_key(kl, key_templates):
             continue
         # 尝试大小写纠正
         cands = [k for k in known if k.lower() == kl]
@@ -1164,14 +1247,17 @@ def run_lint(target, csv_path=None, cn_path=None, jar_path=None):
         csv_keys = load_csv_keys(csv_path)
         cn_keys = load_cn_keys(cn_path)
         jar_keys = load_jar_keys(jar_path) if jar_path else set()
+        text_keys = load_text_keys(find_asset("二进制键名.txt"))
         cn_canon = load_cn_canon(cn_path)
         key_families = load_key_families(cn_path)
+        key_templates = load_key_templates(cn_path)
         canon = build_canon(csv_keys, cn_canon)
-        known = expand_lang_keys(set(csv_keys) | set(cn_keys) | jar_keys)
+        known = expand_lang_keys(set(csv_keys) | set(cn_keys) | jar_keys | text_keys)
         known |= {"repeatconditional", "extratriggeractions", "islockedmessage",
                   "cannotplacemessage", "customvalue", "preferences"}
         res["key_sources"] = dict(csv=len(csv_keys), cn=len(cn_keys),
-                                  jar=len(jar_keys), known=len(known))
+                                  jar=len(jar_keys), text=len(text_keys),
+                                  known=len(known))
         if not known:
             res["ok"] = False
             res["error"] = "没加载到任何键名资料，请用 --csv / --cn 指定路径"
@@ -1207,7 +1293,8 @@ def run_lint(target, csv_path=None, cn_path=None, jar_path=None):
             has_tpl = bool(mod_root_dir and os.path.isfile(
                 os.path.join(mod_root_dir, "all-units.template")))
             all_issues += check_file(f, known, csv_keys, mv, all_sections, root, all_defines,
-                                     referenced, canon, unit_names, key_families, has_tpl)
+                                     referenced, canon, unit_names, key_families, has_tpl,
+                                     key_templates)
 
         all_issues.sort(key=lambda i: (i.path, i.line))
         res["issues"] = all_issues

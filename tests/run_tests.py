@@ -14,6 +14,7 @@
 
 import io
 import os
+import re
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -105,6 +106,38 @@ def check_explain():
     return ok, bad
 
 
+# 键族样本：期望被报成「未知键」的键名集合（小写）。空集合 = 一个都不该报。
+KEY_FAMILY_CASES = [
+    ("key_family_ok.ini", [],
+     "animation_/builtFrom_#/mutator/body_/turret_ 等键族不该报未知"),
+    ("key_family_typo.ini", ["animatoin_speed", "zzznotakey"],
+     "键族放行后，真拼错仍然要报"),
+]
+
+
+def check_key_families():
+    """键族匹配：合法的动态键名不能报，拼错的必须报。"""
+    ok = bad = 0
+    for fn, want, desc in KEY_FAMILY_CASES:
+        path = os.path.join(FIX, fn)
+        if not os.path.isfile(path):
+            print("  FAIL  %-28s 样本不存在" % fn)
+            bad += 1
+            continue
+        res = rw_lint.run_lint(path)
+        got = sorted({m.group(1).lower()
+                      for i in res["issues"] if i.code == "01"
+                      for m in [re.search(r"未知键 `([^`]+)`", i.msg)] if m})
+        if got == sorted(want):
+            print("  PASS  %-28s %s" % (fn, desc))
+            ok += 1
+        else:
+            print("  FAIL  %-28s %s" % (fn, desc))
+            print("        期望 %s，实际 %s" % (sorted(want) or "[]", got))
+            bad += 1
+    return ok, bad
+
+
 def check_workflows():
     """校验 .github/workflows/*.yml 能被 YAML 解析。
 
@@ -186,6 +219,11 @@ def main():
 
         if verbose:
             print("        实际命中：%s" % sorted(got))
+
+    print("\n-- 键族匹配 --")
+    k_ok, k_bad = check_key_families()
+    passed += k_ok
+    failed += k_bad
 
     print("\n-- explain_actions 规则 --")
     e_ok, e_bad = check_explain()

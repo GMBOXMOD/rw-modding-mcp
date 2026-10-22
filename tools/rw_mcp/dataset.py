@@ -110,6 +110,9 @@ def _build(sig):
             ds.jar_keys = rw_lint.load_jar_keys(JAR_PATH)
         except Exception:
             ds.jar_keys = set()
+    # 随仓库分发的键名补充表：没有 game-lib.jar 时也能覆盖
+    ds.jar_keys |= rw_lint.load_text_keys(
+        rw_lint.find_asset("二进制键名.txt"))
 
     # 所有出现过的拼写，供 difflib 纠错
     seen = set()

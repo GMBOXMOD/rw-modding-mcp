@@ -112,10 +112,18 @@ python tools/rw_explain.py "path/to/unit.ini" --json
 
 ## 数据文件
 
-`references/` 下有两份键名资料，`lookup_key` 和 `lint` 依赖它们：
+`references/` 下有三份键名资料，`lookup_key` 和 `lint` 依赖它们：
 
 - `官方代码表（Modding References）.csv` —— 官方 modding 参考表
 - `单位代码表Modding API Reference.txt` —— 中文代码表
+- `二进制键名.txt` —— 从 `game-lib.jar` 常量池导出的键名（1472 个），补前两份没收录的键
+
+前两份是人工维护的，**必然有漏**。实测 `showMiniHp`、`useAsAttacker` 都是原版在用的合法键，
+但两份表都没有 —— 只靠它们会产生大量「未知键」假阳性。第三份就是为此存在的。
+
+另外，`animation_*`、`mutator*`、`builtFrom_#_*`、`body_*` 这类**带参数的键族**
+在代码表里只有模板形式、查不到具体拼写，linter 按前缀/模板整族放行
+（依据是反编译里 `ab2.e("animation_")`、`f.java` 的 `startsWith("body")` 这些写法）。
 
 如果缺失，`lookup_key` 会查不到东西。你可以放自己的副本进去，或用环境变量指定：
 
