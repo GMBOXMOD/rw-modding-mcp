@@ -50,6 +50,46 @@ def codes_of(path):
     return {i.code for i in res["issues"]}, None
 
 
+# explain_actions 的规则样本：文件名 → 期望的规则集合（精确匹配）
+EXPLAIN_CASES = [
+    ("explain_loop_no_reset.ini",   ["loop-counter"],  "循环变量推进了但从没复位"),
+    ("explain_loop_no_advance.ini", ["loop-counter"],  "循环体不推进，门控等不到收尾"),
+    ("explain_unreachable.ini",     ["unreachable"],   "动作定义了但没人调用"),
+    ("explain_uninit_memory.ini",   ["uninit-memory"], "@memory 只读不写"),
+    ("explain_index_bound.ini",     ["index-bound"],   "循环下标步长 2，跳格"),
+]
+
+
+def check_explain():
+    """explain_actions 的四条规则：每个坏样本必须报出对应规则，且不多报。"""
+    try:
+        spec2 = importlib.util.spec_from_file_location(
+            "rw_explain", os.path.join(ROOT, "tools", "rw_explain.py"))
+        rx = importlib.util.module_from_spec(spec2)
+        spec2.loader.exec_module(rx)
+    except Exception as e:                                  # noqa: BLE001
+        print("  SKIP  explain_actions（加载失败：%s）" % e)
+        return 0, 0
+
+    ok = bad = 0
+    for fn, want, desc in EXPLAIN_CASES:
+        path = os.path.join(FIX, fn)
+        if not os.path.isfile(path):
+            print("  FAIL  %-30s 样本不存在" % fn)
+            bad += 1
+            continue
+        res = rx.explain(path, as_json=True)
+        got = sorted({f["rule"] for f in res.get("findings", [])})
+        if got == sorted(want):
+            print("  PASS  %-30s %s" % (fn, desc))
+            ok += 1
+        else:
+            print("  FAIL  %-30s %s" % (fn, desc))
+            print("        期望 %s，实际 %s" % (sorted(want), got))
+            bad += 1
+    return ok, bad
+
+
 def check_workflows():
     """校验 .github/workflows/*.yml 能被 YAML 解析。
 
@@ -131,6 +171,11 @@ def main():
 
         if verbose:
             print("        实际命中：%s" % sorted(got))
+
+    print("\n-- explain_actions 规则 --")
+    e_ok, e_bad = check_explain()
+    passed += e_ok
+    failed += e_bad
 
     print("\n-- 工作流 --")
     w_ok, w_bad = check_workflows()

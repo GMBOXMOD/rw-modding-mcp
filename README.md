@@ -12,6 +12,7 @@
 | `search_source` | 在反编译的 Java 源码里搜索，返回文件、行号、匹配行 |
 | `get_ref` | 结构化速查表：18 个合法事件、27 个逻辑函数、枚举、内存类型、必须配对使用的键、硬限制 |
 | `lint` | 对模组文件或目录跑静态检查，返回结构化错误/警告 |
+| `explain_actions` | 画出 事件/autoTrigger → 动作 → alsoTriggerAction 的调用图，标 repeat / 条件 / memory 读写，并做四条静态检查 |
 
 **全部只读**，不会改你的文件。
 
@@ -61,6 +62,49 @@ python bootstrap.py --check     # 看环境缺什么
 
 > `command` 用 `python` 就行（PATH 里有即可），也可以用绝对路径。
 > 不需要设 `cwd` —— 启动器从自身位置推断仓库根目录。
+
+## explain_actions
+
+把一段单位配置里的动作链画出来，而不是只报"哪一行错了"。
+
+```bash
+python tools/rw_explain.py "path/to/unit.ini"
+python tools/rw_explain.py "path/to/unit.ini" --action scanThreatSlot   # 只看某一条链
+python tools/rw_explain.py "path/to/unit.ini" --json
+```
+
+输出长这样：
+
+```
+=== hiddenAction_onHit ===
+├─ hiddenAction_onHit
+│   trigger: event tookDamage
+│   require: if eventSource != nullUnit
+│   write  : empty_i, existing, scan_i, weight
+  ├─ hiddenAction_scanThreatSlot   ← alsoTriggerAction
+  │   repeat : ${THREAT_SLOTS} (=4) 次
+  │   write  : empty_i, existing, scan_i
+  │   read   : empty_i, existing, scan_i, threat_units
+    ├─ hiddenAction_applyThreat   ← alsoTriggerAction
+    │   gate   : if memory.scan_i == ${THREAT_SLOTS}
+```
+
+**四条能静态判定的规则**：
+
+| 规则 | 查什么 |
+|---|---|
+| `loop-counter` | 循环变量有没有复位成常量、有没有在循环体里推进 |
+| `unreachable` | 动作定义了，但没有任何入边也没有触发，永远不会被调用 |
+| `uninit-memory` | `@memory` 声明了、被读了，但本文件里从没被写过 |
+| `index-bound` | 循环下标步长 > 1（跳格）或带偏移（可能越界） |
+
+**明确不检查的**（工具会把这些列在输出末尾，不假装能查）：
+
+- 条件表达式在运行时成不成立（只认字面量 `true` / `false`）
+- `repeat` 是运行时表达式的情况（只认字面量与 `@global` 常量）
+- 跨文件继承（`copyFrom` / `all-units.template`）产生的调用边
+- luke 数组的真实长度（引擎自动扩容，没有声明可查）
+- 单位最终会不会真的打人
 
 ## 数据文件
 

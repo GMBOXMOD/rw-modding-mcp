@@ -136,6 +136,34 @@ def run_direct():
     else:
         print("  SKIP  lint(示例)：本地没有这个目录")
 
+    # explain_actions：调用图 + 四条规则
+    fx = os.path.join(dataset.ROOT, "tests", "fixtures")
+    if os.path.isdir(fx):
+        r = impl.explain_actions(os.path.join(fx, "explain_loop_no_reset.ini"))
+        check("explain_actions 能画出调用图",
+              r.get("ok") is True and r.get("summary", {}).get("actions", 0) >= 2,
+              r.get("summary"))
+        check("explain_actions 报出 loop-counter",
+              any(f["rule"] == "loop-counter" for f in r.get("findings", [])),
+              r.get("findings"))
+        r = impl.explain_actions(os.path.join(fx, "explain_unreachable.ini"))
+        check("explain_actions 报出 unreachable",
+              any(f["rule"] == "unreachable" for f in r.get("findings", [])),
+              r.get("findings"))
+        r = impl.explain_actions(os.path.join(fx, "explain_index_bound.ini"))
+        check("explain_actions 报出 index-bound",
+              any(f["rule"] == "index-bound" for f in r.get("findings", [])),
+              r.get("findings"))
+        r = impl.explain_actions(os.path.join(fx, "explain_uninit_memory.ini"))
+        check("explain_actions 报出 uninit-memory",
+              any(f["rule"] == "uninit-memory" for f in r.get("findings", [])),
+              r.get("findings"))
+    else:
+        print("  SKIP  explain_actions：没有 tests/fixtures")
+
+    r = impl.explain_actions("no-such-file.ini")
+    check("explain_actions(不存在) 返回 ok:false", r.get("ok") is False, r.get("error"))
+
     r = impl.lint("no-such-dir-xyz")
     check("lint(不存在路径) 返回 ok:false", r.get("ok") is False and "路径" in (r.get("error") or ""), r)
 
@@ -194,6 +222,7 @@ async def run_stdio():
         ("search_source", {"pattern": "addBooleanType", "max_results": 3}, {}),
         ("get_ref", {}, {}),
         ("lint", {"path": lint_target}, {}),
+        ("explain_actions", {"path": os.path.join(lint_target, "explain_loop_no_reset.ini")}, {}),
     ]
 
     async with stdio_client(params) as (r, w):
@@ -201,9 +230,10 @@ async def run_stdio():
             await s.initialize()
             tools = await s.list_tools()
             names = [t.name for t in tools.tools]
-            check("恰好 4 个工具", len(names) == 4, names)
+            check("恰好 5 个工具", len(names) == 5, names)
             check("工具名齐全",
-                  set(names) == {"lookup_key", "search_source", "get_ref", "lint"}, names)
+                  set(names) == {"lookup_key", "search_source", "get_ref",
+                                 "lint", "explain_actions"}, names)
 
             for name, args, expect in cases:
                 res = await s.call_tool(name, args)

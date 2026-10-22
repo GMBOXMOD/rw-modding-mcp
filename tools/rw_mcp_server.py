@@ -43,6 +43,13 @@ def search_source(pattern: str, regex: bool = False, case_sensitive: bool = Fals
 
 
 @mcp.tool()
+def explain_actions(path: str, action: str = "") -> dict:
+    """把事件/autoTrigger → 动作 → alsoTriggerAction 的调用图画出来，标 repeat 次数、门控条件、
+    @memory 读写；并做四条静态检查（循环变量复位与推进、不可达动作、未初始化 memory、下标上界）。"""
+    return impl.explain_actions(path, action or None)
+
+
+@mcp.tool()
 def get_ref() -> dict:
     """返回结构化速查表：18 个合法事件、27 个逻辑函数、值枚举、内存类型、必须配对使用的键、硬限制。"""
     return impl.get_ref()

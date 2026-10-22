@@ -13,6 +13,7 @@ import re
 import time
 
 import rw_lint
+import rw_explain
 from . import dataset
 
 # ---------------------------------------------------------------- 工具函数
@@ -300,6 +301,32 @@ def search_source(pattern, regex=False, case_sensitive=False,
         }
 
     return _safe("search_source", run)
+
+
+# ---------------------------------------------------------------- explain_actions
+
+
+def explain_actions(path, action=None):
+    def run():
+        target, tried = resolve_target(path)
+        if target is None:
+            return {"ok": False, "error": "路径不存在", "tried": tried}
+        res = rw_explain.explain(target, action, as_json=True)
+        if not res.get("ok"):
+            return res
+        # 给调用方一个直接可读的文本版，JSON 版保留完整结构
+        res["text"] = rw_explain.render_text(res, action)
+        res["summary"] = {
+            "actions": sum(1 for n in res["nodes"].values()
+                           if n["kind"] in ("action", "hiddenAction")),
+            "entries": len(res["entries"]),
+            "findings": len(res["findings"]),
+            "by_rule": {r: sum(1 for f in res["findings"] if f["rule"] == r)
+                        for r in sorted({f["rule"] for f in res["findings"]})},
+        }
+        return res
+
+    return _safe("explain_actions", run)
 
 
 # ---------------------------------------------------------------- get_ref
