@@ -35,6 +35,9 @@ JAR_SRC = os.path.join(HERE, "tools", "jar", "src")
 LOG_PATH = os.path.join(HERE, "bootstrap.log")
 CFR_URL = "https://repo1.maven.org/maven2/org/benf/cfr/0.152/cfr-0.152.jar"
 REQUIRED_PKG = "mcp"
+# 锁定主版本：mcp 2.x 把 FastMCP 改名成 MCPServer，1.x 到 2.x 是破坏性变更。
+# 不锁的话，哪天上游出 3.x 改个名，用户装完就是 ModuleNotFoundError。
+REQUIRED_SPEC = "mcp>=2.3,<3"
 
 # 常见 Steam 安装位置
 GAME_CANDIDATES = [
@@ -110,9 +113,9 @@ def ensure_deps(py, quiet=False):
     """确保 venv 里有 mcp。pip 的输出写日志，不占 stdout/stderr。"""
     if has_module(py, REQUIRED_PKG):
         return True
-    _say("正在安装依赖 %s（首次约 20–60 秒）…" % REQUIRED_PKG, quiet)
-    _append_log("pip install " + REQUIRED_PKG)
-    cmd = [py, "-m", "pip", "install", "--only-binary", ":all:", REQUIRED_PKG]
+    _say("正在安装依赖 %s（首次约 20–60 秒）…" % REQUIRED_SPEC, quiet)
+    _append_log("pip install " + REQUIRED_SPEC)
+    cmd = [py, "-m", "pip", "install", "--only-binary", ":all:", REQUIRED_SPEC]
     env = dict(os.environ, PYTHONUTF8="1", PYTHONIOENCODING="utf-8")
     with io.open(LOG_PATH, "a", encoding="utf-8") as log:
         log.write("\n$ %s\n" % " ".join(cmd))

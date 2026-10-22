@@ -89,6 +89,37 @@ def _type_cat(t):
     return None
 
 
+_VER_RX = re.compile(r"1\.1[3-5](?:p\d+)?")
+
+
+def _version_mentions(cn_rows):
+    """从中文表正文里捞出提到的版本号。
+
+    中文表**没有版本字段**（只有 描述/值类型/正确例子/错误例子/约束），
+    所以「两张表的版本声明对比」在数据上做不到 —— 不要假装能做。
+
+    能做的只是：把正文里提到的版本号连同上下文摆出来，让人自己看。
+    比如 setFlag 的「版本差异：1.15 之前范围为 0-31，1.15 起改为无限制」，
+    这是**行为变更**说明，不是「从该版本开始存在」的声明，两者不能混为一谈。
+    """
+    out = []
+    seen = set()
+    for row in cn_rows:
+        blob = " ".join(filter(None, [row.get("description"), row.get("value_type")] +
+                              list(row.get("constraints") or [])))
+        if not blob.strip():
+            continue
+        versions = _VER_RX.findall(blob)
+        if not versions:
+            continue
+        key = (tuple(versions), blob[:60])
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append({"versions": versions, "text": blob.strip()[:160]})
+    return out
+
+
 def _dedup(seq):
     seen, out = set(), []
     for x in seq:
@@ -199,6 +230,7 @@ def lookup_key(key, max_suggestions=5):
             "key": canonical,
             "agreement": agreement,
             "conflicts": conflicts,
+            "version_mentions": _version_mentions(cn_rows),
             "warnings": warnings,
             "sections": _sections_of(low),
             "versions": versions,

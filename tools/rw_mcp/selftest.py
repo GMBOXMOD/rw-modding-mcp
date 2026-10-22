@@ -9,6 +9,7 @@
 
 import argparse
 import asyncio
+import json
 import os
 import sys
 import time
@@ -145,6 +146,29 @@ def run_direct():
         check("search_source 全树扫描 < 800ms", warm < 800, "%.0fms" % warm)
 
 
+def _is_error(res):
+    """mcp 1.x 用 isError，2.x 改成 is_error —— 两个都认。"""
+    for attr in ("is_error", "isError"):
+        v = getattr(res, attr, None)
+        if v is not None:
+            return bool(v)
+    return False
+
+
+def _payload(res):
+    """把 CallToolResult 里的 JSON 文本解析出来。"""
+    if not res.content:
+        return None
+    item = res.content[0]
+    text = getattr(item, "text", None)
+    if text is None:
+        return None
+    try:
+        return json.loads(text)
+    except (ValueError, TypeError):
+        return None
+
+
 async def run_stdio():
     print("== stdio 协议测试 ==")
     try:
@@ -159,6 +183,19 @@ async def run_stdio():
         command=sys.executable, args=[server],
         env={**os.environ, "PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8"})
 
+    # lint 用 fixtures，保证干净克隆 / CI 里也存在
+    lint_target = os.path.normpath(os.path.join(TOOLS, "..", "tests", "fixtures"))
+    if not os.path.isdir(lint_target):
+        lint_target = os.path.join(TOOLS, "rw_lint.py")
+
+    # (工具名, 参数, 额外要断言的字段)
+    cases = [
+        ("lookup_key", {"key": "layer"}, {"found": True, "key": "layer"}),
+        ("search_source", {"pattern": "addBooleanType", "max_results": 3}, {}),
+        ("get_ref", {}, {}),
+        ("lint", {"path": lint_target}, {}),
+    ]
+
     async with stdio_client(params) as (r, w):
         async with ClientSession(r, w) as s:
             await s.initialize()
@@ -168,19 +205,18 @@ async def run_stdio():
             check("工具名齐全",
                   set(names) == {"lookup_key", "search_source", "get_ref", "lint"}, names)
 
-            # 用 fixtures 里的样本做 lint，保证在干净克隆 / CI 里也存在
-            lint_target = os.path.join(TOOLS, "..", "tests", "fixtures")
-            lint_target = os.path.normpath(lint_target)
-            if not os.path.isdir(lint_target):
-                lint_target = os.path.join(TOOLS, "rw_lint.py")
-
-            for name, args in (("lookup_key", {"key": "layer"}),
-                               ("search_source", {"pattern": "addBooleanType", "max_results": 3}),
-                               ("get_ref", {}),
-                               ("lint", {"path": lint_target})):
+            for name, args, expect in cases:
                 res = await s.call_tool(name, args)
-                ok = bool(res.content)
-                check("调用 %s 成功" % name, ok, str(res.content)[:120])
+                # 1) 协议层没报错
+                check("%s 无协议错误" % name, _is_error(res) is False, _is_error(res))
+                # 2) 业务层 ok 为真（bool(content) 判断不出这个）
+                d = _payload(res)
+                check("%s 返回可解析 JSON" % name, isinstance(d, dict), str(res.content)[:120])
+                if not isinstance(d, dict):
+                    continue
+                check("%s ok=True" % name, d.get("ok") is True, d.get("error"))
+                for k, v in expect.items():
+                    check("%s.%s == %r" % (name, k, v), d.get(k) == v, d.get(k))
 
 
 def run_time():

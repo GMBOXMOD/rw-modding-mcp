@@ -7,7 +7,12 @@ on:
 jobs:
   # 规则回归：不需要任何依赖，跑得最快，红了先看这个
   rules:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 主要玩家在 Windows；只测 Linux 会漏掉路径分隔符 / 编码 / 大小写这类问题
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -16,7 +21,7 @@ jobs:
 
       # pyyaml 只用来校验工作流文件本身（踩过 YAML 解析失败的坑）
       - name: 安装 pyyaml
-        run: "python -m pip install pyyaml"
+        run: 'python -m pip install pyyaml'
 
       # 每个 fixture 都是故意写错的配置，断言精确的规则集合（多报/漏报都算失败）
       # 同时校验 .github/workflows/*.yml 能被解析
@@ -25,15 +30,20 @@ jobs:
 
   # 服务本身：装 mcp，把 MCP 服务真的启起来跑一遍协议
   mcp:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
+      # 锁主版本：mcp 2.x 把 FastMCP 改名成 MCPServer，不锁的话上游发 3.x 会直接红
       - name: 安装 mcp SDK
-        run: "python -m pip install --only-binary :all: mcp"
+        run: 'python -m pip install "mcp>=2.3,<3"'
 
       # 直接调用四个工具（没有 game-lib.jar / 反编译产物时会自动 SKIP 对应项）
       - name: 工具自检

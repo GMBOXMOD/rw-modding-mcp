@@ -184,6 +184,11 @@ MCP 的价值在"频繁查证 + 结构化输出 + 省上下文"。偶尔改一�
 **Python 版本？**
 需要 3.10+（`mcp` SDK 的要求）。
 
+**为什么不装最新的 `mcp`？**
+`bootstrap.py` 装的是 `mcp>=2.3,<3`。因为 2.x 把 `FastMCP` 改名成了 `MCPServer`（破坏性变更），
+不锁主版本的话，上游哪天发 3.x 再改个名，用户装完就是 `ModuleNotFoundError`。
+服务端代码里做了 1.x / 2.x 双兼容的 import shim，但依赖本身还是锁住更稳。
+
 ## 许可
 
 MIT。见 `LICENSE`。
