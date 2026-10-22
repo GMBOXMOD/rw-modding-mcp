@@ -1,0 +1,22 @@
+name: test
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # 坏样本回归：每个 fixture 都是故意写错的配置，规则被改坏就会红
+      - name: 坏样本回归
+        run: python tests/run_tests.py
+
+      # 工具自检（不依赖 mcp SDK，缺失的本地模组目录会自动跳过）
+      - name: 工具自检
+        run: python tools/rw_mcp/selftest.py

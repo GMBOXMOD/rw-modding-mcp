@@ -8,7 +8,7 @@
     get_ref        结构化速查表（事件 / 函数 / 枚举 / 内存类型 / 配对规则 / 硬限制）
     lint           对模组文件或目录跑静态检查
 
-注册位置：C:\\Users\\Administrator\\.workbuddy-ai\\mcp.json
+注册：把 bootstrap.py 的路径填进你所用 MCP 客户端的配置即可，见 README。
 """
 
 import os

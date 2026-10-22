@@ -65,13 +65,37 @@ def run_direct():
     r = impl.lookup_key("displayText")
     check("lookup_key(displayText) 命中占位符别名", bool(r.get("cn")), r.get("cn"))
 
-    r = impl.search_source("addBooleanType")
-    check("search_source(addBooleanType) 有命中", r.get("total_matches", 0) >= 1, r.get("total_matches"))
-    check("  → 每条都有 file/line/text",
-          all(m.get("file") and m.get("line") and m.get("text") is not None for m in r.get("matches", [])))
+    # 归一化兜底：多个候选时必须拒绝猜测，不能静默取第一个
+    r = impl.lookup_key("m_ax")
+    check("lookup_key(m_ax) 报歧义而不是瞎猜",
+          r.get("match") == "ambiguous" and len(r.get("ambiguous") or []) >= 2,
+          r.get("match"))
 
-    r = impl.search_source("autoTriggerOnEvent", path_filter="custom/")
-    check("search_source 路径过滤生效", r.get("files_scanned", 0) < 1698, r.get("files_scanned"))
+    # 不许剥数字：customTarget1 / customTarget2 是两个键
+    r = impl.lookup_key("customTarget")
+    check("lookup_key(customTarget) 不误匹配到 customTarget1",
+          r.get("found") is False, r.get("key"))
+
+    # 两张表交叉校验
+    r = impl.lookup_key("layer")
+    check("lookup_key 带 agreement 字段", r.get("agreement") in
+          ("both", "csv_only", "cn_only", "jar_only"), r.get("agreement"))
+
+    # search_source 需要反编译产物；没跑过 --decompile 时跳过
+    has_src = os.path.isdir(dataset.JAVA_SRC) and any(
+        f.endswith(".java") for _dp, _dn, fns in os.walk(dataset.JAVA_SRC) for f in fns)
+
+    if has_src:
+        r = impl.search_source("addBooleanType")
+        check("search_source(addBooleanType) 有命中", r.get("total_matches", 0) >= 1, r.get("total_matches"))
+        check("  → 每条都有 file/line/text",
+              all(m.get("file") and m.get("line") and m.get("text") is not None
+                  for m in r.get("matches", [])))
+
+        r = impl.search_source("autoTriggerOnEvent", path_filter="custom/")
+        check("search_source 路径过滤生效", r.get("files_scanned", 0) < 1698, r.get("files_scanned"))
+    else:
+        print("  SKIP  search_source：没有反编译源码（跑 bootstrap.py --decompile 可生成）")
 
     r = impl.search_source("(", regex=True)
     check("search_source 非法正则返回 ok:false 不崩", r.get("ok") is False, r)
@@ -81,22 +105,32 @@ def run_direct():
     check("get_ref 函数 27 个", len(r.get("functions", [])) == 27, len(r.get("functions", [])))
     check("get_ref 配对规则 4 条", len(r.get("rules", {}).get("must_pair", [])) == 4)
 
-    r = impl.lint("Kings of Cards")
-    check("lint(Kings of Cards) 通过", r.get("ok") is True, r.get("error"))
-    check("  → 15 文件 / 0 错误 / 16 警告",
-          (r.get("files"), r.get("errors"), r.get("warnings")) == (15, 0, 16),
-          (r.get("files"), r.get("errors"), r.get("warnings")))
+    # 下面两项依赖本地模组目录；别人克隆仓库后没有这些目录，跳过而不是报错
+    koc = os.path.join(dataset.ROOT, "Kings of Cards")
+    if os.path.isdir(koc):
+        r = impl.lint("Kings of Cards")
+        check("lint(Kings of Cards) 通过", r.get("ok") is True, r.get("error"))
+        check("  → 15 文件 / 0 错误 / 16 警告",
+              (r.get("files"), r.get("errors"), r.get("warnings")) == (15, 0, 16),
+              (r.get("files"), r.get("errors"), r.get("warnings")))
+    else:
+        print("  SKIP  lint(Kings of Cards)：本地没有这个模组目录")
 
-    r = impl.lint("示例")
-    check("lint(示例) 5 个文件", r.get("ok") is True and r.get("files") == 5, r.get("files"))
+    ex = os.path.join(dataset.ROOT, "示例")
+    if os.path.isdir(ex):
+        r = impl.lint("示例")
+        check("lint(示例) 5 个文件", r.get("ok") is True and r.get("files") == 5, r.get("files"))
+    else:
+        print("  SKIP  lint(示例)：本地没有这个目录")
 
     r = impl.lint("no-such-dir-xyz")
     check("lint(不存在路径) 返回 ok:false", r.get("ok") is False and "路径" in (r.get("error") or ""), r)
 
-    t0 = time.time()
-    impl.search_source("addBooleanType")
-    warm = (time.time() - t0) * 1000
-    check("search_source 全树扫描 < 800ms", warm < 800, "%.0fms" % warm)
+    if has_src:
+        t0 = time.time()
+        impl.search_source("addBooleanType")
+        warm = (time.time() - t0) * 1000
+        check("search_source 全树扫描 < 800ms", warm < 800, "%.0fms" % warm)
 
 
 async def run_stdio():

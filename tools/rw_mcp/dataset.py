@@ -23,7 +23,27 @@ if _TOOLS not in sys.path:
 import rw_lint  # noqa: E402  （必须先补 sys.path）
 
 # 默认的游戏安装路径；可用 RW_GAME_JAR 覆盖
-DEFAULT_JAR = r"D:\steam\steamapps\common\Rusted Warfare\game-lib.jar"
+# 游戏安装目录候选：只放**常见默认位置**，不放任何人的个人路径。
+# 优先用 RW_GAME_JAR 环境变量覆盖。
+GAME_CANDIDATES = [
+    r"D://steam//steamapps//common//Rusted Warfare",
+    r"C://Program Files (x86)//Steam//steamapps//common//Rusted Warfare",
+    r"C://Program Files//Steam//steamapps//common//Rusted Warfare",
+    os.path.expanduser(r"~\Steam\steamapps\common\Rusted Warfare"),
+    os.path.expanduser("~/Library/Application Support/Steam/steamapps/common/Rusted Warfare"),
+    os.path.expanduser("~/.steam/steam/steamapps/common/Rusted Warfare"),
+]
+
+
+def _find_jar():
+    env = os.environ.get("RW_GAME_JAR")
+    if env and os.path.isfile(env):
+        return env
+    for d in GAME_CANDIDATES:
+        p = os.path.join(d, "game-lib.jar")
+        if os.path.isfile(p):
+            return p
+    return None
 
 
 def _resolve_root():
@@ -42,7 +62,7 @@ def _resolve_root():
 ROOT = _resolve_root()
 CSV_PATH = os.environ.get("RW_CSV") or rw_lint.find_asset("官方代码表（Modding References）.csv")
 CN_PATH = os.environ.get("RW_CN") or rw_lint.find_asset("单位代码表Modding API Reference.txt")
-JAR_PATH = os.environ.get("RW_GAME_JAR") or (DEFAULT_JAR if os.path.isfile(DEFAULT_JAR) else None)
+JAR_PATH = _find_jar()
 JAVA_SRC = os.environ.get("RW_JAVA_SRC") or os.path.join(ROOT, "tools", "jar", "src")
 
 

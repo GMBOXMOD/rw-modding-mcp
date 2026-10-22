@@ -86,19 +86,35 @@ def lookup_key(key, max_suggestions=5):
         n_sug = _clamp(max_suggestions, 1, 20, 5)
 
         match = None
+        ambiguous = []
         if low in ds.cn_entries or low in ds.csv_rows or low in ds.jar_keys:
             match = "exact"
         elif any(s.lower() == low for s in ds.spellings):
             match = "case"
         else:
-            norm = re.sub(r"[_0-9]", "", low)
-            for cand in ds.spellings:
-                if re.sub(r"[_0-9]", "", cand.lower()) == norm:
-                    low, match = cand.lower(), "normalized"
-                    break
+            # 兜底匹配：只忽略下划线和大小写，**绝不剥数字**。
+            # 剥数字会把 customTarget1 / customTarget2 混成一个，
+            # 而这类"查到了但答错"比查不到更难排查。
+            norm = low.replace("_", "")
+            cands = [s for s in ds.spellings if s.lower().replace("_", "") == norm]
+            if len(cands) == 1:
+                low, match = cands[0].lower(), "normalized"
+            elif len(cands) > 1:
+                # 多个候选一律不猜，把选择权交回去
+                ambiguous = sorted(cands)
 
         if match is None:
             near = difflib.get_close_matches(q, ds.spellings, n=n_sug, cutoff=0.6)
+            if ambiguous:
+                return {
+                    "ok": True, "query": key, "found": False, "match": "ambiguous", "key": None,
+                    "ambiguous": [{"key": s,
+                                   "sections": [x["letter"] for x in _sections_of(s.lower())]}
+                                  for s in ambiguous],
+                    "suggestions": [],
+                    "notes": ["查询归一化后同时匹配多个键，无法判断你要哪个 —— "
+                              "请从 ambiguous 里挑一个完整拼写再查。"],
+                }
             return {
                 "ok": True, "query": key, "found": False, "match": "none", "key": None,
                 "suggestions": [{"key": s, "sections": [x["letter"] for x in _sections_of(s.lower())]}
@@ -126,9 +142,26 @@ def lookup_key(key, max_suggestions=5):
             related = [s for s in ds.spellings
                        if s.lower().startswith(pref) and s.lower() != low][:8]
 
+        # 两张表交叉校验：只被一张收录，说明表本身有缺口或版本不同步。
+        # 工具**无法判断谁对**，只能把这个事实摆出来，不替使用者背书。
+        has_csv, has_cn = bool(csv_rows), bool(cn_rows)
+        agreement = ("both" if has_csv and has_cn
+                     else "csv_only" if has_csv
+                     else "cn_only" if has_cn
+                     else "jar_only")
+        warnings = []
+        if agreement == "csv_only":
+            warnings.append("只有官方 CSV 收录，中文表没有 —— 可能是中文表缺条目或版本不同步")
+        elif agreement == "cn_only":
+            warnings.append("只有中文表收录，官方 CSV 没有 —— 可能是 CSV 缺条目或版本不同步")
+        elif agreement == "jar_only":
+            warnings.append("只在游戏二进制里出现过，两份代码表都没收录 —— 说明文字不可信")
+
         return {
             "ok": True, "query": key, "found": True, "match": match,
             "key": canonical,
+            "agreement": agreement,
+            "warnings": warnings,
             "sections": _sections_of(low),
             "versions": versions,
             "value_types": _dedup([r["value_type"] for r in csv_rows]),
