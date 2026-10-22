@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """铁锈战争模组 MCP 服务端（stdio）。
 
-四个只读工具：
+五个只读工具：
     lookup_key     查一个 luke 键的拼写 / 所属节 / 版本 / 类型 / 描述 / 例子
     search_source  在反编译的 Java 源码树里搜索
     get_ref        结构化速查表（事件 / 函数 / 枚举 / 内存类型 / 配对规则 / 硬限制）

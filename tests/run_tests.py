@@ -50,18 +50,31 @@ def codes_of(path):
     return {i.code for i in res["issues"]}, None
 
 
-# explain_actions 的规则样本：文件名 → 期望的规则集合（精确匹配）
+# explain_actions 的规则样本：(规则, 行号) 精确比对 —— 同名多条也必须条数一致
 EXPLAIN_CASES = [
-    ("explain_loop_no_reset.ini",   ["loop-counter"],  "循环变量推进了但从没复位"),
-    ("explain_loop_no_advance.ini", ["loop-counter"],  "循环体不推进，门控等不到收尾"),
-    ("explain_unreachable.ini",     ["unreachable"],   "动作定义了但没人调用"),
-    ("explain_uninit_memory.ini",   ["uninit-memory"], "@memory 只读不写"),
-    ("explain_index_bound.ini",     ["index-bound"],   "循环下标步长 2，跳格"),
+    ("explain_loop_no_reset.ini",       [("loop-counter", 7)],
+     "循环变量推进了但从没复位"),
+    ("explain_loop_no_advance.ini",     [("loop-counter", 7)],
+     "循环体不推进，门控等不到收尾"),
+    ("explain_loop_reset_elsewhere.ini", [("loop-counter", 11)],
+     "复位在另一条链上，不算这条链复位过"),
+    ("explain_unreachable.ini",         [("unreachable", 6)],
+     "动作定义了但没人调用"),
+    ("explain_uninit_memory.ini",       [("uninit-memory", 5)],
+     "@memory 只读不写"),
+    ("explain_index_bound.ini",         [("index-bound", 14)],
+     "循环下标步长 2，跳格"),
+    ("explain_trailing_comment.ini",    [("trailing-comment", 7),
+                                         ("trailing-comment", 12),
+                                         ("trailing-comment", 13)],
+     "三处行尾注释（@global / 边 / repeat）"),
+    ("explain_update_unit_memory.ini",  [],
+     "updateUnitMemory 也算写，不应误报"),
 ]
 
 
 def check_explain():
-    """explain_actions 的四条规则：每个坏样本必须报出对应规则，且不多报。"""
+    """explain_actions：每个样本的 (规则, 行号) 必须精确匹配，多报少报都算失败。"""
     try:
         spec2 = importlib.util.spec_from_file_location(
             "rw_explain", os.path.join(ROOT, "tools", "rw_explain.py"))
@@ -75,17 +88,19 @@ def check_explain():
     for fn, want, desc in EXPLAIN_CASES:
         path = os.path.join(FIX, fn)
         if not os.path.isfile(path):
-            print("  FAIL  %-30s 样本不存在" % fn)
+            print("  FAIL  %-34s 样本不存在" % fn)
             bad += 1
             continue
         res = rx.explain(path, as_json=True)
-        got = sorted({f["rule"] for f in res.get("findings", [])})
-        if got == sorted(want):
-            print("  PASS  %-30s %s" % (fn, desc))
+        got = sorted((f["rule"], f["line"]) for f in res.get("findings", []))
+        want = sorted(want)
+        if got == want:
+            print("  PASS  %-34s %s" % (fn, desc))
             ok += 1
         else:
-            print("  FAIL  %-30s %s" % (fn, desc))
-            print("        期望 %s，实际 %s" % (sorted(want), got))
+            print("  FAIL  %-34s %s" % (fn, desc))
+            print("        期望 %s" % (want or "[]"))
+            print("        实际 %s" % (got or "[]"))
             bad += 1
     return ok, bad
 

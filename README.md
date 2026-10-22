@@ -2,9 +2,9 @@
 
 `https://github.com/GMBOXMOD/rw-modding-mcp`
 
-给 AI 助手用的《铁锈战争》(Rusted Warfare) 模组开发工具集，通过 [MCP](https://modelcontextprotocol.io) 暴露四个**只读**工具，让助手不用每次翻文档、翻反编译源码就能回答"这个键怎么用"。
+给 AI 助手用的《铁锈战争》(Rusted Warfare) 模组开发工具集，通过 [MCP](https://modelcontextprotocol.io) 暴露五个**只读**工具，让助手不用每次翻文档、翻反编译源码就能回答"这个键怎么用"。
 
-## 四个工具
+## 五个工具
 
 | 工具 | 作用 |
 |---|---|
@@ -89,14 +89,18 @@ python tools/rw_explain.py "path/to/unit.ini" --json
     │   gate   : if memory.scan_i == ${THREAT_SLOTS}
 ```
 
-**四条能静态判定的规则**：
+**六条能静态判定的规则**：
 
 | 规则 | 查什么 |
 |---|---|
-| `loop-counter` | 循环变量有没有复位成常量、有没有在循环体里推进 |
+| `loop-counter` | 同一触发链上、repeat 之前有没有把循环变量复位成常量；循环体里有没有推进 |
 | `unreachable` | 动作定义了，但没有任何入边也没有触发，永远不会被调用 |
-| `uninit-memory` | `@memory` 声明了、被读了，但本文件里从没被写过 |
+| `uninit-memory` | `@memory` 声明了、被读了，但本文件里从没被写过（`setUnitMemory` 与 `updateUnitMemory` 都算写） |
 | `index-bound` | 循环下标步长 > 1（跳格）或带偏移（可能越界） |
+| `trailing-comment` | 行尾 `#` 注释 —— 引擎不剥，值会带着注释一起解析 |
+| `unresolved-edge` | `alsoTriggerAction` 指向的动作不存在 |
+
+`loop-counter` 的复位判断是**沿触发链向上找**的：文件别处写了 `scan_i= 0`，不代表这条链进循环前复位过。
 
 **明确不检查的**（工具会把这些列在输出末尾，不假装能查）：
 
@@ -153,7 +157,7 @@ tools/
   rw_mcp_server.py      MCP 服务入口
   rw_mcp/
     dataset.py          路径解析 + 数据缓存 + Java 源码索引
-    impl.py             四个工具的实现
+    impl.py             五个工具的实现
     selftest.py         自检（22 项）
   rw_lint.py            静态检查器（也可单独当命令行用）
   game_loadtest.py      进游戏加载测试（无窗口，需要本机装游戏）

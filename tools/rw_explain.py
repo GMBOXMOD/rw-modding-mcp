@@ -61,6 +61,7 @@ def _parse_sections(lines):
     """
     sections = {}
     order = []
+    comments = []
     cur = None
     i, n = 0, len(lines)
     while i < n:
@@ -105,13 +106,20 @@ def _parse_sections(lines):
                         break
                     buf.append(ln)
                 val = "\n".join(buf)
+        elif " #" in val:
+            # 行尾注释。引擎其实**不剥**行尾 #（只跳过整行以 # 开头的），
+            # 这里为了能画出图，按去掉注释后的值解析，同时记一条告警。
+            comments.append({"line": line_no, "section": cur, "key": key, "raw": val})
+            val = val.split(" #", 1)[0].rstrip()
 
         sections[cur].setdefault(key, []).append((line_no, val))
 
-    return sections, order
+    return sections, order, comments
 
 
-def _scan_directives(lines):
+def _scan_directives(lines, comments=None):
+    """@memory / @global 声明。@global 的值同样要剥行尾注释，
+    否则 `@global SLOTS: 4 # 槽数` 会让 repeat 解析不出来，整条循环分析被跳过。"""
     mem, glob = {}, {}
     for idx, line in enumerate(lines, 1):
         st = line.strip()
@@ -121,7 +129,13 @@ def _scan_directives(lines):
             continue
         g = re.match(r"^@global\s+([A-Za-z_]\w*)\s*:\s*(.+)$", st)
         if g:
-            glob[g.group(1).upper()] = {"value": g.group(2).strip(), "line": idx}
+            val = g.group(2).strip()
+            if " #" in val:
+                if comments is not None:
+                    comments.append({"line": idx, "section": "@global",
+                                     "key": g.group(1), "raw": val})
+                val = val.split(" #", 1)[0].rstrip()
+            glob[g.group(1).upper()] = {"value": val, "line": idx}
     return mem, glob
 
 
@@ -217,8 +231,8 @@ def _make_resolver(sections):
 
 def analyze_file(path):
     lines = io.open(path, encoding="utf-8", errors="replace").read().split("\n")
-    sections, order = _parse_sections(lines)
-    mem_decl, globals_ = _scan_directives(lines)
+    sections, order, comments = _parse_sections(lines)
+    mem_decl, globals_ = _scan_directives(lines, comments)
     resolve = _make_resolver(sections)
     sec_line = dict(order)
 
@@ -262,13 +276,21 @@ def analyze_file(path):
                                       "repeat": node["repeat"]})
 
         writes = set()
-        for _ln, v in kv.get("setUnitMemory", []):
-            for base, lhs, rhs in _parse_setunitmemory(v):
-                writes.add(base)
-                node["setunitmemory"].append({"base": base, "target": lhs, "value": rhs})
-                node["memory_reads"] |= _mem_reads(rhs)
-            for arr, idx in _array_accesses(v):
-                node["array_accesses"].append({"array": arr, "index": idx})
+        # updateUnitMemory 官方定义是「类似 setUnitMemory 但性能更好」，
+        # 写入语义一样，必须一起扫，否则用它写的变量会被误报成「只读不写」。
+        for wk in ("setUnitMemory", "updateUnitMemory"):
+            for _ln, v in kv.get(wk, []):
+                for base, lhs, rhs in _parse_setunitmemory(v):
+                    writes.add(base)
+                    node["setunitmemory"].append({"base": base, "target": lhs,
+                                                  "value": rhs, "via": wk})
+                    node["memory_reads"] |= _mem_reads(rhs)
+                for arr, idx in _array_accesses(v):
+                    node["array_accesses"].append({"array": arr, "index": idx})
+                # readUnitMemory(name=...) 是函数式读取
+                for nm in re.findall(r"readUnitMemory\s*\(\s*(?:name\s*=\s*)?[\"']?"
+                                     r"([A-Za-z_]\w*)", v):
+                    node["memory_reads"].add(nm)
         node["memory_writes"] = sorted(writes)
         node["memory_reads"] = sorted(node["memory_reads"] | _mem_reads(node["require"] or ""))
 
@@ -281,6 +303,8 @@ def analyze_file(path):
                 inbound.setdefault(e["resolved"], []).append(name)
 
     findings = []
+    findings += _rule_trailing_comment(comments)
+    findings += _rule_unresolved_edge(nodes)
     findings += _rule_loop_counter(nodes)
     findings += _rule_unreachable(nodes, inbound)
     findings += _rule_uninit_memory(nodes, mem_decl)
@@ -297,27 +321,80 @@ def analyze_file(path):
         "globals": {k: v["value"] for k, v in globals_.items()},
         "unresolved_edges": sorted({e["to"] for node in nodes.values()
                                     for e in node["edges"] if not e["resolved"]}),
+        "trailing_comments": comments,
         "not_checked": NOT_CHECKED,
     }
 
 
 # ---------------------------------------------------------------- 规则
 
-def _rule_loop_counter(nodes):
+def _rule_trailing_comment(comments):
     out = []
-    const_writes = {}
+    for c in comments:
+        out.append({
+            "rule": "trailing-comment", "level": "warning", "line": c["line"],
+            "message": "第 %d 行 %s 有行尾注释：引擎不剥行尾 #，这个值会带着注释一起解析；"
+                       "本工具按去掉注释后的值画图，但游戏里很可能不生效"
+                       % (c["line"], c["key"]),
+        })
+    return out
+
+
+def _rule_unresolved_edge(nodes):
+    out = []
     for name, node in nodes.items():
+        for e in node["edges"]:
+            if e["resolved"]:
+                continue
+            out.append({
+                "rule": "unresolved-edge", "level": "warning", "line": node["line"],
+                "message": "「%s」的 alsoTriggerAction 指向「%s」，但文件里没有对应的"
+                           "[action_%s] / [hiddenAction_%s]（也可能是行尾注释或拼写问题）"
+                           % (name, e["to"], e["to"], e["to"]),
+            })
+    return out
+
+
+def _rule_loop_counter(nodes):
+    """循环变量：同一触发链上、repeat 之前有没有复位；循环体里有没有推进。
+
+    复位必须看**祖先链**，不能看全文件 ——
+    文件别处也写 `scan_i= 0` 不代表这条链在进循环前复位过。
+    """
+    # 入边表（沿它向上找祖先）
+    inbound = {}
+    for name, node in nodes.items():
+        for e in node["edges"]:
+            if e["resolved"]:
+                inbound.setdefault(e["resolved"], set()).add(name)
+
+    def closure(parent):
+        seen, stack = set(), [parent]
+        while stack:
+            cur = stack.pop()
+            if cur in seen:
+                continue
+            seen.add(cur)
+            stack.extend(inbound.get(cur, ()))
+        return seen
+
+    # 每个节点里"把变量赋成常量"的集合（标量、右侧不引用自己）
+    const_of = {}
+    for name, node in nodes.items():
+        got = set()
         for w in node["setunitmemory"]:
-            base, rhs = w["base"], w["value"].strip()
             if "[" in w["target"]:
                 continue
-            if not re.search(r"\b%s\b" % re.escape(base), rhs):
-                const_writes.setdefault(base, []).append(name)
+            if not re.search(r"\b%s\b" % re.escape(w["base"]), w["value"]):
+                got.add(w["base"])
+        const_of[name] = got
 
+    out = []
     for name, node in nodes.items():
         rep = node["repeat"]
         if not rep or rep["value"] is None or rep["value"] < 2:
             continue
+        scope = closure(name)
         for e in node["edges"]:
             tgt_name = e["resolved"]
             tgt = nodes.get(tgt_name) if tgt_name else None
@@ -337,12 +414,14 @@ def _rule_loop_counter(nodes):
                     })
                 continue
             for w in adv:
-                if w["base"] not in const_writes:
+                base = w["base"]
+                if not any(base in const_of[a] for a in scope):
                     out.append({
                         "rule": "loop-counter", "level": "warning", "line": node["line"],
-                        "message": "「%s」的循环变量 %s 在循环体里推进了，但全文件找不到"
-                                   "把它复位成常量的写法（例如 %s= 0），多轮调用会接着上一轮的值"
-                                   % (tgt_name, w["base"], w["base"]),
+                        "message": "「%s」repeat %s 次调用「%s」，循环变量 %s 在循环体里推进了，"
+                                   "但这条触发链上（含 %s 本身）找不到进循环前把它复位成常量的写法"
+                                   "（例如 %s= 0）—— 多轮调用会接着上一轮的值"
+                                   % (name, rep["expr"], tgt_name, base, name, base),
                     })
     return out
 
