@@ -28,7 +28,7 @@ spec.loader.exec_module(rw_lint)
 
 FIX = os.path.join(HERE, "fixtures")
 
-# 每个样本：期望出现的规则编号（必须全部命中），以及是否允许出现错误
+# 每个样本：期望的**精确**规则集合（多报、少报都算失败）
 CASES = [
     ("bad_event_name.ini",          ["10"],           "事件名拼错（tookDamge）"),
     ("bad_isvisible.ini",           ["11"],           "hiddenAction 里写 isVisible"),
@@ -67,15 +67,10 @@ def main():
             failed += 1
             continue
 
-        missing = [c for c in want if c not in got]
-        ok = not missing
-
-        # 合法样本额外要求：零错误
-        if not want:
-            res = rw_lint.run_lint(path)
-            if res["errors"] != 0:
-                ok = False
-                missing = ["(出现了 %d 个错误)" % res["errors"]]
+        want_set, got_set = set(want), set(got)
+        missing = sorted(want_set - got_set)     # 该报没报
+        extra = sorted(got_set - want_set)       # 不该报却报了
+        ok = not missing and not extra
 
         if ok:
             passed += 1
@@ -83,9 +78,11 @@ def main():
         else:
             failed += 1
             print("  FAIL  %-28s %s" % (fn, desc))
-            print("        期望规则 %s，实际 %s" % (want or "(无)", sorted(got)))
+            print("        期望 %s，实际 %s" % (sorted(want_set) or "[]", sorted(got_set)))
             if missing:
-                print("        缺：%s" % missing)
+                print("        漏报：%s" % missing)
+            if extra:
+                print("        多报：%s" % extra)
 
         if verbose:
             print("        实际命中：%s" % sorted(got))

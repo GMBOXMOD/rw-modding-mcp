@@ -64,6 +64,31 @@ def _notes_for(low):
     return out
 
 
+_TYPE_CATS = ("bool", "num", "str", "unit", "file")
+
+
+def _type_cat(t):
+    """把值类型归到粗类目。认不出来返回 None —— 不参与比较，避免命名差异造成噪音。
+
+    只认 5 类：bool / num / str / unit / file。
+    像 `price` vs `price(s)`、`tags`、`memories` 这类只是叫法不同，一律不判冲突。
+    """
+    t = (t or "").lower().strip()
+    if not t:
+        return None
+    if "bool" in t:
+        return "bool"
+    if t in ("float", "number", "int") or "number" in t:
+        return "num"
+    if "string" in t or t in ("text", "localestring"):
+        return "str"
+    if t == "unit" or t == "unit[]":
+        return "unit"
+    if "image" in t or "file" in t:
+        return "file"
+    return None
+
+
 def _dedup(seq):
     seen, out = set(), []
     for x in seq:
@@ -101,7 +126,7 @@ def lookup_key(key, max_suggestions=5):
                 low, match = cands[0].lower(), "normalized"
             elif len(cands) > 1:
                 # 多个候选一律不猜，把选择权交回去
-                ambiguous = sorted(cands)
+                ambiguous = sorted(cands)[:10]
 
         if match is None:
             near = difflib.get_close_matches(q, ds.spellings, n=n_sug, cutoff=0.6)
@@ -149,6 +174,18 @@ def lookup_key(key, max_suggestions=5):
                      else "csv_only" if has_csv
                      else "cn_only" if has_cn
                      else "jar_only")
+        conflicts = []
+        if has_csv and has_cn:
+            csv_cats = {_type_cat(r.get("value_type")) for r in csv_rows} - {None}
+            cn_cats = {_type_cat(r.get("value_type")) for r in cn_rows} - {None}
+            if csv_cats and cn_cats and not (csv_cats & cn_cats):
+                conflicts.append({
+                    "field": "value_type",
+                    "csv": _dedup([r.get("value_type") for r in csv_rows]),
+                    "cn": _dedup([r.get("value_type") for r in cn_rows]),
+                    "note": "两张表对同一个键的类型说法互斥 —— 谁对需要你自己判断",
+                })
+
         warnings = []
         if agreement == "csv_only":
             warnings.append("只有官方 CSV 收录，中文表没有 —— 可能是中文表缺条目或版本不同步")
@@ -161,6 +198,7 @@ def lookup_key(key, max_suggestions=5):
             "ok": True, "query": key, "found": True, "match": match,
             "key": canonical,
             "agreement": agreement,
+            "conflicts": conflicts,
             "warnings": warnings,
             "sections": _sections_of(low),
             "versions": versions,

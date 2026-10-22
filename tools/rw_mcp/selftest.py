@@ -44,7 +44,14 @@ def run_direct():
     check("lookup_key(canAttack) 找到", r.get("found") is True, r)
     check("  → 规范拼写正确", r.get("key") == "canAttack", r.get("key"))
     check("  → 归属 D 章(attack)", any(s["letter"] == "D" for s in r.get("sections", [])), r.get("sections"))
-    check("  → 三个数据源都有", all(r.get("sources", {}).values()), r.get("sources"))
+    # jar 数据源只在找得到 game-lib.jar 时才要求（CI / Linux 上通常没有）
+    if dataset.JAR_PATH:
+        check("  → 三个数据源都有", all(r.get("sources", {}).values()), r.get("sources"))
+    else:
+        check("  → CSV 与中文表都有",
+              bool(r.get("sources", {}).get("csv")) and bool(r.get("sources", {}).get("cn")),
+              r.get("sources"))
+        print("  SKIP  jar 数据源：没找到 game-lib.jar（设 RW_GAME_JAR 可覆盖）")
 
     r = impl.lookup_key("canattack")
     check("lookup_key(canattack) 大小写归一", r.get("match") in ("case", "normalized"), r.get("match"))
@@ -80,6 +87,11 @@ def run_direct():
     r = impl.lookup_key("layer")
     check("lookup_key 带 agreement 字段", r.get("agreement") in
           ("both", "csv_only", "cn_only", "jar_only"), r.get("agreement"))
+    check("lookup_key 带 conflicts 字段", isinstance(r.get("conflicts"), list), r.get("conflicts"))
+
+    # 两张表类型互斥的已知样本（CSV 说 float，中文表说 boolean）
+    r = impl.lookup_key("energyNeedstoRechargeToFull")
+    check("lookup_key 能报出两表类型冲突", len(r.get("conflicts") or []) >= 1, r.get("conflicts"))
 
     # search_source 需要反编译产物；没跑过 --decompile 时跳过
     has_src = os.path.isdir(dataset.JAVA_SRC) and any(
@@ -156,10 +168,16 @@ async def run_stdio():
             check("工具名齐全",
                   set(names) == {"lookup_key", "search_source", "get_ref", "lint"}, names)
 
+            # 用 fixtures 里的样本做 lint，保证在干净克隆 / CI 里也存在
+            lint_target = os.path.join(TOOLS, "..", "tests", "fixtures")
+            lint_target = os.path.normpath(lint_target)
+            if not os.path.isdir(lint_target):
+                lint_target = os.path.join(TOOLS, "rw_lint.py")
+
             for name, args in (("lookup_key", {"key": "layer"}),
                                ("search_source", {"pattern": "addBooleanType", "max_results": 3}),
                                ("get_ref", {}),
-                               ("lint", {"path": "示例"})):
+                               ("lint", {"path": lint_target})):
                 res = await s.call_tool(name, args)
                 ok = bool(res.content)
                 check("调用 %s 成功" % name, ok, str(res.content)[:120])
