@@ -4,6 +4,8 @@
 
 `https://github.com/GMBOXMOD/rw-modding-mcp`
 
+改了什么见 [CHANGELOG.md](CHANGELOG.md)。
+
 ## 五个工具
 
 | 工具 | 作用 |
@@ -45,19 +47,14 @@ Claude Desktop 用 `claude_desktop_config.json`，Cursor 用 `~/.cursor/mcp.json
 
 ## 性能
 
-| 场景 | 优化前 | 优化后 |
-|---|---|---|
-| 冷启动到第一次 lint（19 文件） | 6.14 s | 约 2.4 s |
-| lint 5 个文件 | 53 ms | 7 ms |
-| lint 19 个文件 | 86 ms | 18 ms |
-| lint 1037 个文件 | 3300 ms | 605 ms |
-| 1037 文件里改 1 个再 lint | 3300 ms | 约 640 ms |
+| 场景 | 耗时 |
+|---|---|
+| 冷启动到第一次 lint | 约 2.4 s |
+| lint 19 个文件 | 18 ms |
+| lint 1037 个文件 | 605 ms |
+| 1037 文件里改 1 个再 lint | 约 640 ms |
 
-三件事撑起这些数字：
-
-- 探活不再 `import mcp`（那一步要 1.8 秒），装好后落一个 `.venv/.deps-ready` 标记，正常启动不启子进程。
-- `check_file` 原来又解析了一遍文件，现在两处共用一份带 mtime 记忆的结果。
-- 未改动的文件复用上次结论。跨文件依赖单独处理：改 A 会让依赖 A 的 B 一起重算，改无关文件只重算那一个。
+未改动的文件复用上次结论，跨文件依赖会一并校验：改 A 会让依赖 A 的 B 一起重算。
 
 缓存放在 `%LOCALAPPDATA%\rw-modding-mcp\lint`（Linux/macOS 走 `~/.cache`），不写你的模组目录。`--no-cache` 或 `RW_LINT_CACHE=0` 关掉。
 
