@@ -1,12 +1,10 @@
 # 铁锈战争模组 MCP
 
-给 AI 助手用的《铁锈战争》模组开发工具集，通过 [MCP](https://modelcontextprotocol.io) 接入。
+《铁锈战争》模组开发的 MCP 服务端，五个只读工具。
 
-`https://github.com/GMBOXMOD/rw-modding-mcp`
+仓库 `https://github.com/GMBOXMOD/rw-modding-mcp`，变更见 [CHANGELOG.md](CHANGELOG.md)。
 
-改了什么见 [CHANGELOG.md](CHANGELOG.md)。
-
-## 五个工具
+## 工具
 
 | 工具 | 作用 |
 |---|---|
@@ -20,13 +18,17 @@
 
 ## 安装
 
+需要 Python 3.10+。
+
 ```bash
 git clone https://github.com/GMBOXMOD/rw-modding-mcp.git
 cd rw-modding-mcp
 python bootstrap.py --check     # 看环境缺什么
 ```
 
-客户端里指向 `bootstrap.py`，它会自己建 venv、装依赖：
+首次启动会自动建 venv、装 `mcp`，约 20–60 秒。
+
+## 客户端配置
 
 ```json
 {
@@ -39,26 +41,11 @@ python bootstrap.py --check     # 看环境缺什么
 }
 ```
 
-Claude Desktop 用 `claude_desktop_config.json`，Cursor 用 `~/.cursor/mcp.json`，Cline 用 `cline_mcp_settings.json`，格式同上。VS Code 的 `.vscode/mcp.json` 外层键叫 `servers`，里面一样。
+Claude Desktop 写进 `claude_desktop_config.json`，Cursor 写进 `~/.cursor/mcp.json`，Cline 写进 `cline_mcp_settings.json`。VS Code 的 `.vscode/mcp.json` 外层键是 `servers`，里面一样。
 
-`command` 写 `python` 就行（PATH 里有），也可以给绝对路径。不用设 `cwd`。
+不用设 `cwd`。`command` 写 `python` 或绝对路径都行。
 
-首次启动装 `mcp` 要 20–60 秒，之后每次约 2.4 秒。
-
-## 性能
-
-| 场景 | 耗时 |
-|---|---|
-| 冷启动到第一次 lint | 约 2.4 s |
-| lint 19 个文件 | 18 ms |
-| lint 1037 个文件 | 605 ms |
-| 1037 文件里改 1 个再 lint | 约 640 ms |
-
-未改动的文件复用上次结论，跨文件依赖会一并校验：改 A 会让依赖 A 的 B 一起重算。
-
-缓存放在 `%LOCALAPPDATA%\rw-modding-mcp\lint`（Linux/macOS 走 `~/.cache`），不写你的模组目录。`--no-cache` 或 `RW_LINT_CACHE=0` 关掉。
-
-客户端要保持服务进程常驻。stdio 下进程每次都重起的话，2.4 秒会变成每次调用的固定成本。依赖装好之后可以跳过启动器，直接指向 venv 解释器，再省 0.6 秒：
+启动约 2.4 秒，客户端要在会话期间保持进程存活。想再快一点可以跳过启动器：
 
 ```json
 {
@@ -75,32 +62,13 @@ Claude Desktop 用 `claude_desktop_config.json`，Cursor 用 `~/.cursor/mcp.json
 
 ## explain_actions
 
-只报"哪一行错了"不够，有时候要知道动作链怎么串起来的。
-
 ```bash
 python tools/rw_explain.py "path/to/unit.ini"
 python tools/rw_explain.py "path/to/unit.ini" --action scanThreatSlot   # 只看一条链
 python tools/rw_explain.py "path/to/unit.ini" --json
 ```
 
-```
-=== hiddenAction_onHit ===
-├─ hiddenAction_onHit
-│   trigger: event tookDamage
-│   require: if eventSource != nullUnit
-│   write  : empty_i, existing, scan_i, weight
-  ├─ hiddenAction_scanThreatSlot   ← alsoTriggerAction
-  │   repeat : ${THREAT_SLOTS} (=4) 次
-  │   write  : empty_i, existing, scan_i
-  │   read   : empty_i, existing, scan_i, threat_units
-    ├─ hiddenAction_applyThreat   ← alsoTriggerAction
-    │   require: if memory.weight > 0 and (memory.existing >= 0 or memory.empty_i >= 0)
-    │   gate   : if memory.scan_i == ${THREAT_SLOTS}
-    │   write  : scan_i, threat_units, threat_value
-    │   read   : empty_i, existing, scan_i, threat_value, weight
-```
-
-六条能静态判定的规则：
+报这六条：
 
 | 规则 | 查什么 |
 |---|---|
@@ -111,9 +79,7 @@ python tools/rw_explain.py "path/to/unit.ini" --json
 | `trailing-comment` | 行尾 `#` 注释——引擎不剥，值会带着注释一起解析 |
 | `unresolved-edge` | `alsoTriggerAction` 指向的动作不存在 |
 
-`loop-counter` 沿触发链向上找复位。文件别处写了 `scan_i= 0`，不算这条链复位过。
-
-不检查的会列在输出末尾：运行时条件真假、运行时 `repeat`、`copyFrom` 和 `all-units.template` 带来的跨文件边、luke 数组的真实长度、单位最后到底会不会打人。
+运行时条件真假、运行时 `repeat`、`copyFrom` 带来的跨文件边、数组真实长度，这些它不查，会在输出末尾列出来。
 
 ## 命令行
 
@@ -126,81 +92,43 @@ python tools/rw_lint.py "D:/path/to/yourmod" --no-cache # 强制全量
 python tools/rw_lint.py --ref                           # 速查表
 python tools/rw_lint.py --json                          # 机器可读
 python tools/rw_mcp/selftest.py                         # 自检
+python tools/game_loadtest.py "D:/path/to/yourmod"      # 进游戏加载测试（无窗口）
 ```
 
-`game_loadtest.py` 会真的启一次游戏做加载测试（无窗口），需要本机装着游戏：
-
-```bash
-python tools/game_loadtest.py "D:/path/to/yourmod"
-```
-
-## 数据与反编译
-
-`references/` 下三份键名资料，`lookup_key` 和 `lint` 都依赖它们：
-
-- `官方代码表（Modding References）.csv` — 官方参考表
-- `单位代码表Modding API Reference.txt` — 中文代码表
-- `二进制键名.txt` — 从 `game-lib.jar` 常量池导出的 1472 个键
-
-前两份人工维护，有漏。`showMiniHp`、`useAsAttacker` 是原版在用的合法键，两份表都没收，只靠它们会刷一屏假阳性。第三份补的就是这个。`animation_*`、`mutator*`、`builtFrom_#_*`、`body_*` 这类带参数的键族在表里只有模板形式，linter 按前缀和模板整族放行。
-
-想换自己的副本，`lookup_key` 认 `RW_CSV` 和 `RW_CN` 两个环境变量（`lint` 命令行不读这两个）。
-
-`search_source` 读的是反编译产物，仓库里没有。用自己游戏里的 `game-lib.jar` 生成一次：
+## search_source 需要反编译
 
 ```bash
 python bootstrap.py --decompile
 ```
 
-它会找游戏目录（或用 `--game` 指定）、下载 CFR（约 2 MB）、反编译到 `tools/jar/src/`，需要 JDK 17+。不做这步也能用，只是 `search_source` 返回空。
+需要 JDK 17+，会自动找游戏目录（或用 `--game` 指定）。不做这步 `search_source` 返回空。
 
-反编译结果是游戏厂商的代码，版权归原作者。仓库不含也不该含它，`.gitignore` 已排除，`cfr.jar` 同理（用的时候下载）。
+## 数据文件
 
-## 目录结构
+`references/` 下三份，缺了 `lookup_key` 查不到东西：
 
-```
-bootstrap.py            启动器（建 venv / 装依赖 / 检查数据）
-tools/
-  rw_mcp_server.py      MCP 服务入口
-  rw_mcp/
-    dataset.py          路径解析 + 数据缓存 + Java 源码索引
-    impl.py             五个工具的实现
-    selftest.py         自检（34 项）
-  rw_lint.py            静态检查器
-  rw_cache.py           两级缓存
-  rw_explain.py         动作调用图
-  game_loadtest.py      进游戏加载测试
-references/             键名资料
-```
+- `官方代码表（Modding References）.csv`
+- `单位代码表Modding API Reference.txt`
+- `二进制键名.txt`
 
-## 局限
-
-`lookup_key` 的权威性来自那两份第三方表。表本身有错、或者版本比你的游戏旧，它照样返回 `found: true` 配一段看着很自信的解释。返回里的 `agreement` 字段能看出是两张表都有还是只有一张，谁对得你自己判断。
-
-`lint` 只管语法和引用。键名拼写、配对规则、资源引用、必填键它查；状态机断在第几步、仇恨值有没有累积、单位为什么不打人，它可能全绿。
-
-`search_source` 跟你的游戏版本绑定，换版本要重新反编译。返回的是 Java 片段，适合问"引擎怎么做的"，不适合查键。
-
-偶尔改一处，直接翻表比装这个快。MCP 的价值在频繁查证和结构化输出。
-
-这个项目 0 star。`bootstrap.py` 会建 venv、装依赖、按需下载 CFR，代码只读、有回归测试，跑之前自己过一眼。
+换自己的副本：`RW_CSV` / `RW_CN`（只对 MCP 生效，`lint` 命令行不读）。
 
 ## 常见问题
 
-启动失败看仓库根的 `bootstrap.log`，pip 输出和反编译命令都在里面。
+**启动失败** 看仓库根的 `bootstrap.log`。
 
-装依赖失败多半是网络问题，换镜像：
+**装依赖失败** 多半是网络，换镜像：
 
 ```bash
 .venv/Scripts/python -m pip install -i https://mirrors.aliyun.com/pypi/simple mcp
 ```
 
-`lookup_key` 查不到东西，是 `references/` 里两份表缺了。
+**lint 全绿但单位不打人** 它只管语法和引用，逻辑对不对要自己跑。
 
-需要 Python 3.10+。装的是 `mcp>=2.3,<3`——2.x 把 `FastMCP` 改名成 `MCPServer`，不锁主版本的话上游发 3.x 再改个名，用户装完就是 `ModuleNotFoundError`。
+**`lookup_key` 说的不对** 表是第三方维护的。返回里的 `agreement` 说明两张表都有还是只有一张，谁对得自己判断。
+
+**缓存** 在 `%LOCALAPPDATA%\rw-modding-mcp\lint`（Linux/macOS 走 `~/.cache`），`--no-cache` 或 `RW_LINT_CACHE=0` 关掉。
 
 ## 许可
 
-MIT，见 `LICENSE`。
-
-`references/` 里的键名资料版权归各自作者，此处仅作分发便利，原作者有异议请提 issue 删除。
+MIT，见 `LICENSE`。`references/` 里的键名资料版权归各自作者，原作者有异议请提 issue 删除。
