@@ -78,6 +78,8 @@ EXPLAIN_CASES = [
      "三处行尾注释（@global / 边 / repeat）"),
     ("explain_update_unit_memory.ini",  [],
      "updateUnitMemory 也算写，不应误报"),
+    ("explain_action_entry.ini",        [],
+     "action_* 是玩家入口，不该报 unreachable"),
 ]
 
 

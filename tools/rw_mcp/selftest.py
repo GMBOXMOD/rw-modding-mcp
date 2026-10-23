@@ -135,8 +135,12 @@ def run_direct():
 
     ex = os.path.join(dataset.ROOT, "示例")
     if os.path.isdir(ex):
+        # 按目录里实际的模板数量断言，而不是写死一个数字 ——
+        # 写死的话每加一个示例这里就假红一次（已经发生过两次）。
+        want = len([f for f in os.listdir(ex) if f.lower().endswith(".template")])
         r = impl.lint("示例")
-        check("lint(示例) 5 个文件", r.get("ok") is True and r.get("files") == 5, r.get("files"))
+        check("lint(示例) 覆盖全部 %d 个模板" % want,
+              r.get("ok") is True and r.get("files") == want, r.get("files"))
     else:
         print("  SKIP  lint(示例)：本地没有这个目录")
 

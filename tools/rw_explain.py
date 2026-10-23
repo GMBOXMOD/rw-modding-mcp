@@ -427,9 +427,16 @@ def _rule_loop_counter(nodes):
 
 
 def _rule_unreachable(nodes, inbound):
+    """只有 hiddenAction 才可能是「不可达」。
+
+    [action_*] 是玩家在界面按钮上点出来的，入口就是玩家自己 ——
+    它天然没有入边，报它等于给每个带按钮的模组刷一屏假警告。
+    """
     out = []
     for name, node in nodes.items():
         if not _is_actionish(name) or node["triggers"] or inbound.get(name):
+            continue
+        if node["kind"] == "action":
             continue
         out.append({
             "rule": "unreachable", "level": "warning", "line": node["line"],
