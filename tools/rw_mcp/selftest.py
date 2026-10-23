@@ -94,6 +94,13 @@ def run_direct():
     r = impl.lookup_key("energyNeedstoRechargeToFull")
     check("lookup_key 能报出两表类型冲突", len(r.get("conflicts") or []) >= 1, r.get("conflicts"))
 
+    # 批量查键：一次往返查多个，省的是「每次重发上下文」的钱
+    r = impl.lookup_key(keys=["layer", "canAttack", "zzzNoSuchKey"])
+    check("lookup_key 批量返回", r.get("count") == 3 and r.get("found") == 2, r.get("found"))
+    check("  → 列出查不到的键", r.get("missing") == ["zzzNoSuchKey"], r.get("missing"))
+    check("  → 结果与逐个调用一致",
+          r["results"]["layer"].get("key") == impl.lookup_key("layer").get("key"))
+
     # search_source 需要反编译产物；没跑过 --decompile 时跳过
     has_src = os.path.isdir(dataset.JAVA_SRC) and any(
         f.endswith(".java") for _dp, _dn, fns in os.walk(dataset.JAVA_SRC) for f in fns)

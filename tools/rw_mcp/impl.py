@@ -133,7 +133,23 @@ def _dedup(seq):
 # ---------------------------------------------------------------- lookup_key
 
 
-def lookup_key(key, max_suggestions=5):
+def lookup_key(key="", max_suggestions=5, keys=None):
+    # 批量：一次查多个键。写一个单位常常要连着查七八个键，
+    # 一个一个查就是七八次往返 —— 每次往返都要把整个上下文重发一遍，
+    # 那才是 token 的大头（单次返回只有几百 token，重发的是十万级的上下文）。
+    if keys:
+        def run_batch():
+            got, missing = {}, []
+            for k in keys:
+                r = lookup_key(k, max_suggestions)
+                got[k] = r
+                if not r.get("found"):
+                    missing.append(k)
+            return {"ok": True, "count": len(keys),
+                    "found": len(keys) - len(missing),
+                    "missing": missing, "results": got}
+        return _safe("lookup_key", run_batch)
+
     def run():
         q = (key or "").strip()
         if not q:

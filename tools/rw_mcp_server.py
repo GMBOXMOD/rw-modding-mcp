@@ -31,9 +31,13 @@ mcp = FastMCP("rusted-warfare-modding")
 
 
 @mcp.tool()
-def lookup_key(key: str, max_suggestions: int = 5) -> dict:
-    """查一个 luke 键：规范拼写、所属节、版本、值类型、中英文描述与例子；查不到时给近似拼写建议。"""
-    return impl.lookup_key(key, max_suggestions)
+def lookup_key(key: str = "", max_suggestions: int = 5,
+               keys: list[str] | None = None) -> dict:
+    """查一个 luke 键：规范拼写、所属节、版本、值类型、中英文描述与例子；查不到时给近似拼写建议。
+
+    要查多个键时用 keys 一次传完（写一个单位通常要查七八个键），
+    比逐个调用省很多往返。"""
+    return impl.lookup_key(key, max_suggestions, keys)
 
 
 @mcp.tool()
