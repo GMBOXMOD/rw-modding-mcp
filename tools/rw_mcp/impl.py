@@ -308,10 +308,12 @@ def search_source(pattern, regex=False, case_sensitive=False,
 
 def explain_actions(path, action=None):
     def run():
+        t0 = time.perf_counter()
         target, tried = resolve_target(path)
         if target is None:
             return {"ok": False, "error": "路径不存在", "tried": tried}
         res = rw_explain.explain(target, action, as_json=True)
+        res["elapsed_ms"] = int((time.perf_counter() - t0) * 1000)
         if not res.get("ok"):
             return res
         # 给调用方一个直接可读的文本版，JSON 版保留完整结构
@@ -352,38 +354,82 @@ def get_ref():
 # ---------------------------------------------------------------- lint
 
 
-def lint(path, only="all", max_issues=200):
+def lint(path="", only="all", max_issues=200, paths=None):
     def run():
         n_max = _clamp(max_issues, 1, 1000, 200)
-        target, tried = resolve_target(path)
-        if target is None:
-            return {"ok": False, "error": "路径不存在", "tried": tried}
 
-        t0 = time.time()
-        # 不传 jar_path：与 CLI 默认行为一致，保证同一目录在两边得到相同的计数。
-        res = rw_lint.run_lint(target)
-        dur = int((time.time() - t0) * 1000)
+        # 批量：一次调用检查多个文件/目录，省掉 agent 来回往返
+        raw_targets = list(paths) if paths else ([path] if path else [])
+        if not raw_targets:
+            return {"ok": False, "error": "需要 path 或 paths"}
 
-        if not res["ok"]:
-            return {"ok": False, "error": res.get("error") or "检查失败",
-                    "target": target, "tried": tried}
+        resolved, missing = [], []
+        for p in raw_targets:
+            t, tried = resolve_target(p)
+            if t is None:
+                missing.append({"path": p, "tried": tried})
+            else:
+                resolved.append((p, t))
+        if not resolved:
+            return {"ok": False, "error": "路径不存在", "missing": missing}
 
-        issues = res["issues"]
+        t0 = time.perf_counter()
+        all_issues, skipped, per_target = [], [], []
+        scanned = 0
+        errors = warnings = 0
+        cache_tot = {"enabled": False, "hits": 0, "misses": 0}
+        last = {}
+
+        for p, t in resolved:
+            # 不传 jar_path：与 CLI 默认行为一致，保证同一目录在两边得到相同的计数。
+            res = rw_lint.run_lint(t)
+            if not res["ok"]:
+                per_target.append({"path": p, "ok": False, "error": res.get("error")})
+                continue
+            last = res
+            all_issues += res["issues"]
+            skipped += res["skipped"]
+            scanned += res["files"]
+            errors += res["errors"]
+            warnings += res["warnings"]
+            c = res.get("cache") or {}
+            if c.get("enabled"):
+                cache_tot["enabled"] = True
+                cache_tot["hits"] += c.get("hits", 0)
+                cache_tot["misses"] += c.get("misses", 0)
+            per_target.append({"path": p, "ok": True, "files": res["files"],
+                               "errors": res["errors"], "warnings": res["warnings"],
+                               "elapsed_ms": res.get("elapsed_ms", 0)})
+
+        shown = all_issues
         if only in ("errors", "error"):
-            issues = [i for i in issues if i.level == "error"]
+            shown = [i for i in all_issues if i.level == "error"]
         elif only in ("warnings", "warning"):
-            issues = [i for i in issues if i.level == "warning"]
+            shown = [i for i in all_issues if i.level == "warning"]
 
-        return {
-            "ok": True, "target": target,
-            "files": res["files"], "errors": res["errors"], "warnings": res["warnings"],
-            "issues": [i.as_dict() for i in issues[:n_max]],
-            "issues_total": len(issues), "issues_returned": min(len(issues), n_max),
-            "truncated": len(issues) > n_max,
-            "skipped": res["skipped"],
-            "key_sources": res["key_sources"],
-            "assets": res["assets"],
-            "duration_ms": dur,
+        all_issues.sort(key=lambda i: (i.path, i.line))
+        shown.sort(key=lambda i: (i.path, i.line))
+        dur = int((time.perf_counter() - t0) * 1000)
+
+        out = {
+            "ok": True,
+            "target": resolved[0][1] if len(resolved) == 1 else None,
+            "targets": per_target,
+            "files": scanned, "scanned_files": scanned,
+            "errors": errors, "warnings": warnings,
+            "issues": [i.as_dict() for i in shown[:n_max]],
+            "issues_total": len(shown), "issues_returned": min(len(shown), n_max),
+            "truncated": len(shown) > n_max,
+            "skipped": skipped,
+            "elapsed_ms": dur, "duration_ms": dur,
+            "cache": cache_tot,
         }
+        if len(resolved) == 1:
+            # 单目标时保留键名资料与资源路径，批量时没有单一含义就省略
+            out["key_sources"] = last.get("key_sources") or {}
+            out["assets"] = last.get("assets") or {}
+        if missing:
+            out["missing"] = missing
+        return out
 
     return _safe("lint", run)

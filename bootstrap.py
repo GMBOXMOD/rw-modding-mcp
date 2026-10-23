@@ -120,14 +120,83 @@ def ensure_venv(quiet=False):
 
 
 def has_module(py, name):
+    """只查模块在不在搜索路径里，**不真正 import**。
+
+    `import mcp` 会连带加载 pydantic / httpx 等依赖，实测约 1.8 秒；
+    `find_spec` 只解析查找路径，约 0.2 秒。探活不需要真的执行包。
+    """
+    code = ("import importlib.util, sys; "
+            "sys.exit(0 if importlib.util.find_spec(%r) is not None else 1)") % name
+    r = subprocess.run([py, "-c", code],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    return r.returncode == 0
+
+
+def can_import(py, name):
+    """真正 import 一次。只在「刚 pip 装完」时用，确认依赖链完整而不是装了个空壳。"""
     r = subprocess.run([py, "-c", "import %s" % name],
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     return r.returncode == 0
 
 
+# ---------------------------------------------------------------- 就绪标记
+#
+# 探活本身（哪怕只跑 find_spec）也要起一个 Python 子进程，约 0.9–1.0 秒。
+# 依赖装好之后这个结果不会变，所以落一个标记，命中就完全不起子进程。
+# 标记失效条件：REQUIRED_SPEC 变了，或者 mcp 包目录消失。
+
+READY_MARKER = os.path.join(VENV_DIR, ".deps-ready")
+
+
+def _site_packages():
+    """按 venv 布局推算 site-packages，不启动子进程。"""
+    if os.name == "nt":
+        return os.path.join(VENV_DIR, "Lib", "site-packages")
+    lib = os.path.join(VENV_DIR, "lib")
+    try:
+        for name in sorted(os.listdir(lib)):
+            if name.startswith("python"):
+                sp = os.path.join(lib, name, "site-packages")
+                if os.path.isdir(sp):
+                    return sp
+    except OSError:
+        pass
+    return None
+
+
+def _deps_ready_cached():
+    """标记命中返回 True。只读一个 JSON + 一次 isfile，不起子进程。"""
+    try:
+        with io.open(READY_MARKER, encoding="utf-8") as fh:
+            data = json.load(fh)
+    except (OSError, ValueError):
+        return False
+    if data.get("spec") != REQUIRED_SPEC:          # 依赖声明变了就失效
+        return False
+    pkg = data.get("mcp_package") or ""
+    return bool(pkg) and os.path.isfile(os.path.join(pkg, "__init__.py"))
+
+
+def _write_deps_marker():
+    sp = _site_packages()
+    if not sp:
+        return
+    pkg = os.path.join(sp, REQUIRED_PKG)
+    if not os.path.isfile(os.path.join(pkg, "__init__.py")):
+        return
+    try:
+        with io.open(READY_MARKER, "w", encoding="utf-8") as fh:
+            json.dump({"spec": REQUIRED_SPEC, "mcp_package": pkg}, fh)
+    except OSError:
+        pass
+
+
 def ensure_deps(py, quiet=False):
     """确保 venv 里有 mcp。pip 的输出写日志，不占 stdout/stderr。"""
+    if _deps_ready_cached():
+        return True
     if has_module(py, REQUIRED_PKG):
+        _write_deps_marker()
         return True
     _say("正在安装依赖 %s（首次约 20–60 秒）…" % REQUIRED_SPEC, quiet)
     _append_log("pip install " + REQUIRED_SPEC)
@@ -137,9 +206,11 @@ def ensure_deps(py, quiet=False):
         log.write("\n$ %s\n" % " ".join(cmd))
         log.flush()
         r = subprocess.run(cmd, stdout=log, stderr=subprocess.STDOUT, env=env)
-    if r.returncode != 0 or not has_module(py, REQUIRED_PKG):
+    # 这里必须用真 import 验证：pip 可能装了个空壳，find_spec 查不出来
+    if r.returncode != 0 or not can_import(py, REQUIRED_PKG):
         _fail("安装依赖失败，详情见 %s" % LOG_PATH)
         return False
+    _write_deps_marker()
     _say("依赖安装完成。", quiet)
     return True
 
@@ -265,14 +336,15 @@ def cmd_check(args):
     st = data_status()
     game = find_game(args.game)
 
+    # 只探一次。原来这里 has_module 被调了两遍，等于把最贵的探活付了两次。
+    deps_ok = os.path.isfile(py) and (_deps_ready_cached() or has_module(py, REQUIRED_PKG))
+
     rows = [
         ("Python", "%s (需要 ≥3.10)" % sys.version.split()[0],
          sys.version_info >= (3, 10)),
         ("虚拟环境", VENV_DIR if os.path.isfile(py) else "未创建（首次启动会自动建）",
          os.path.isfile(py)),
-        ("依赖 mcp", "已装" if os.path.isfile(py) and has_module(py, REQUIRED_PKG)
-                     else "未装（首次启动会自动装）",
-         os.path.isfile(py) and has_module(py, REQUIRED_PKG)),
+        ("依赖 mcp", "已装" if deps_ok else "未装（首次启动会自动装）", deps_ok),
         ("官方代码表", st["csv"] or "缺失", bool(st["csv"])),
         ("中文代码表", st["cn"] or "缺失", bool(st["cn"])),
         ("反编译源码", ("%d 个 .java" % st["java_files"]) if st["java_files"] else

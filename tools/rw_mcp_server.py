@@ -19,10 +19,11 @@ if HERE not in sys.path:
     sys.path.insert(0, HERE)
 
 # mcp 2.x 把 FastMCP 改名为 MCPServer；1.x 仍是 FastMCP。两条线都兼容。
+# 先试 2.x：bootstrap 锁的是 mcp>=2.3,<3，反过来的话每次启动都要先付一次失败的导入。
 try:
-    from mcp.server.fastmcp import FastMCP            # mcp 1.x
-except ImportError:                                    # pragma: no cover
     from mcp.server import MCPServer as FastMCP        # mcp 2.x
+except ImportError:                                    # pragma: no cover
+    from mcp.server.fastmcp import FastMCP             # mcp 1.x
 
 from rw_mcp import impl                               # noqa: E402
 
@@ -56,9 +57,14 @@ def get_ref() -> dict:
 
 
 @mcp.tool()
-def lint(path: str, only: str = "all", max_issues: int = 200) -> dict:
-    """对模组文件或目录跑静态检查，返回结构化的 issues（错误/警告、文件、行号、说明）。"""
-    return impl.lint(path, only, max_issues)
+def lint(path: str = "", only: str = "all", max_issues: int = 200,
+         paths: list[str] | None = None) -> dict:
+    """对模组文件或目录跑静态检查，返回结构化的 issues（错误/警告、文件、行号、说明）。
+
+    改完一个文件再跑时，未改动的文件直接复用上次结论（会先校验跨文件依赖），
+    返回里的 elapsed_ms / scanned_files / cache 可以直接看出省了多少。
+    paths 可一次传多个文件，省掉多次往返。"""
+    return impl.lint(path, only, max_issues, paths)
 
 
 def main():

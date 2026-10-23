@@ -61,6 +61,31 @@ import sys
 import csv
 import json
 import argparse
+import time
+
+
+def _load_cache_module():
+    """加载同目录的 rw_cache.py。
+
+    不用 `import rw_cache`：本文件经常被 importlib 从任意 cwd 直接加载
+    （skill/scripts/ 下就是这种用法），那时 sys.path 里没有 tools/。
+    """
+    import importlib.util
+    here = os.path.dirname(os.path.abspath(__file__))
+    path = os.path.join(here, "rw_cache.py")
+    if not os.path.isfile(path):
+        return None
+    try:
+        spec = importlib.util.spec_from_file_location("rw_lint_cache", path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod
+    except Exception:                                        # noqa: BLE001
+        return None
+
+
+rw_cache = _load_cache_module()
+_PARSE_MEMO = rw_cache.ParseMemo() if rw_cache else None
 
 # 引擎按**前缀**动态消费的键族。
 # 反编译确认：ag.java 里 `for (String s : ab2.e("animation_"))`、
@@ -479,8 +504,17 @@ class Issue:
                     line=self.line, message=self.msg)
 
 
-def parse_file(path):
-    """返回 (sections, entries, raw_lines)。entries = [(line_no, key, value, section)]"""
+def parse_file(path, use_cache=True):
+    """返回 (sections, entries, raw_lines)。entries = [(line_no, key, value, section)]
+
+    带进程内记忆：按 (绝对路径, mtime_ns, 大小) 命中。
+    check_file 内部也要 parse 一次，两处共用同一份结果 ——
+    否则每个文件会被解析两遍（实测占整个扫描时间的 21%）。
+    """
+    if use_cache and _PARSE_MEMO is not None:
+        hit = _PARSE_MEMO.get(path)
+        if hit is not None:
+            return hit
     raw = io.open(path, "rb").read()
     text = raw.decode("utf-8-sig", "replace")
     lines = text.split("\n")
@@ -536,7 +570,10 @@ def parse_file(path):
         m = re.match(r"^([A-Za-z_@][\w@]*)\s*([:＝：=])\s*(.*)$", stripped)
         if m:
             entries.append((idx, m.group(1), m.group(3), cur))
-    return sections, entries, lines, raw, directives, defines
+    result = (sections, entries, lines, raw, directives, defines)
+    if use_cache and _PARSE_MEMO is not None:
+        _PARSE_MEMO.put(path, result)
+    return result
 
 
 # ---------------------------------------------------------------- 检查
@@ -544,9 +581,9 @@ def parse_file(path):
 def check_file(path, known, csv_keys, min_version, all_sections, mod_root,
                global_defines=frozenset(), referenced=frozenset(), canon=None,
                unit_names=frozenset(), key_families=None, has_units_template=False,
-               key_templates=()):
+               key_templates=(), parsed=None):
     issues = []
-    sections, entries, lines, raw, directives, defines = parse_file(path)
+    sections, entries, lines, raw, directives, defines = parsed or parse_file(path)
 
     # E07 BOM
     if raw[:3] == b"\xef\xbb\xbf":
@@ -1230,13 +1267,83 @@ def render_ref_text():
     return "\n".join(out)
 
 
-def run_lint(target, csv_path=None, cn_path=None, jar_path=None):
+def _data_signature(csv_path, cn_path, jar_path, text_path, n_jar):
+    """数据表 + 规则文件本身的指纹。任何一项变了，整份结果缓存作废。
+
+    带上 __file__ 的 mtime：改了规则却复用旧结论是最难查的一类 bug。
+    """
+    if rw_cache is None:
+        return ""
+    parts = ["v%d" % rw_cache.CACHE_VERSION]
+    for p in (csv_path, cn_path, text_path, os.path.abspath(__file__)):
+        try:
+            st = os.stat(p)
+            parts.append("%s:%d:%d" % (os.path.basename(p), st.st_mtime_ns, st.st_size))
+        except (OSError, TypeError):
+            parts.append("%s:-" % (p,))
+    parts.append("jar=%d" % n_jar)
+    return rw_cache.digest(parts)
+
+
+def _stamp(path):
+    try:
+        st = os.stat(path)
+        return (st.st_mtime_ns, st.st_size)
+    except (OSError, TypeError):
+        return None
+
+
+_TABLE_MEMO = {}
+
+
+def _load_tables(csv_path, cn_path, jar_path):
+    """加载全部键名资料，按文件指纹记忆化。
+
+    这几张表加起来 500 KB 左右，解析约 50 ms —— 对单文件检查来说这是固定成本，
+    而长驻服务每次 lint 都要付一遍。表没变就直接复用。
+    """
+    text_path = find_asset("二进制键名.txt")
+    key = (csv_path, _stamp(csv_path), cn_path, _stamp(cn_path),
+           jar_path, _stamp(jar_path), text_path, _stamp(text_path))
+    hit = _TABLE_MEMO.get(key)
+    if hit is not None:
+        return hit
+
+    csv_keys = load_csv_keys(csv_path)
+    cn_keys = load_cn_keys(cn_path)
+    jar_keys = load_jar_keys(jar_path) if jar_path else set()
+    text_keys = load_text_keys(text_path)
+    cn_canon = load_cn_canon(cn_path)
+    key_families = load_key_families(cn_path)
+    key_templates = load_key_templates(cn_path)
+    canon = build_canon(csv_keys, cn_canon)
+    known = expand_lang_keys(set(csv_keys) | set(cn_keys) | jar_keys | text_keys)
+    known |= {"repeatconditional", "extratriggeractions", "islockedmessage",
+              "cannotplacemessage", "customvalue", "preferences"}
+
+    val = dict(csv_keys=csv_keys, cn_keys=cn_keys, jar_keys=jar_keys,
+               text_keys=text_keys, canon=canon, known=known,
+               key_families=key_families, key_templates=key_templates,
+               text_path=text_path)
+    _TABLE_MEMO.clear()          # 只保留最近一份，避免多套数据表常驻内存
+    _TABLE_MEMO[key] = val
+    return val
+
+
+def run_lint(target, csv_path=None, cn_path=None, jar_path=None, incremental=True):
     """程序化入口：不打印、不退出，返回结果字典。
 
     issues 里是 Issue 对象（保留 __str__ 的原始格式），需要 JSON 时用 .as_dict()。
+
+    incremental=True 时启用两级缓存（见 rw_cache.py）：
+      一级按文件 mtime/大小复用解析结果；
+      二级复用逐文件检查结果，但会先重放它上次对跨文件集合做过的所有查询，
+      有一条答案变了就重算 —— 所以改一个文件不会漏掉别的文件的结论。
     """
+    t_start = time.perf_counter()
     res = dict(ok=True, error=None, files=0, errors=0, warnings=0,
-               issues=[], skipped=[], key_sources={}, assets={})
+               issues=[], skipped=[], key_sources={}, assets={},
+               elapsed_ms=0, scanned_files=0, cache={"enabled": False})
     try:
         here = os.path.dirname(os.path.abspath(__file__))
         root = os.path.dirname(here)
@@ -1244,17 +1351,10 @@ def run_lint(target, csv_path=None, cn_path=None, jar_path=None):
         cn_path = cn_path or find_asset("单位代码表Modding API Reference.txt")
         res["assets"] = dict(csv=csv_path, cn=cn_path, jar=jar_path)
 
-        csv_keys = load_csv_keys(csv_path)
-        cn_keys = load_cn_keys(cn_path)
-        jar_keys = load_jar_keys(jar_path) if jar_path else set()
-        text_keys = load_text_keys(find_asset("二进制键名.txt"))
-        cn_canon = load_cn_canon(cn_path)
-        key_families = load_key_families(cn_path)
-        key_templates = load_key_templates(cn_path)
-        canon = build_canon(csv_keys, cn_canon)
-        known = expand_lang_keys(set(csv_keys) | set(cn_keys) | jar_keys | text_keys)
-        known |= {"repeatconditional", "extratriggeractions", "islockedmessage",
-                  "cannotplacemessage", "customvalue", "preferences"}
+        tb = _load_tables(csv_path, cn_path, jar_path)
+        csv_keys, cn_keys, jar_keys = tb["csv_keys"], tb["cn_keys"], tb["jar_keys"]
+        text_keys, canon, known = tb["text_keys"], tb["canon"], tb["known"]
+        key_families, key_templates = tb["key_families"], tb["key_templates"]
         res["key_sources"] = dict(csv=len(csv_keys), cn=len(cn_keys),
                                   jar=len(jar_keys), text=len(text_keys),
                                   known=len(known))
@@ -1265,17 +1365,19 @@ def run_lint(target, csv_path=None, cn_path=None, jar_path=None):
 
         files = collect_files(target)
         res["files"] = len(files)
+        res["scanned_files"] = len(files)
 
         all_sections, all_defines, unit_names, referenced, parsed = set(), set(), set(), set(), {}
         for f in files:
             try:
-                secs, entries, lines, raw, _dirs, _defs = parse_file(f)
+                full = parse_file(f)
             except Exception as e:
                 res["skipped"].append(dict(file=f, error=str(e)))
                 continue
-            parsed[f] = (secs, entries)
+            secs, entries, lines = full[0], full[1], full[2]
+            parsed[f] = full
             all_sections |= {s for _, s in secs}
-            all_defines |= _defs
+            all_defines |= full[5]
             for _ln, _k, _v, _sec in entries:
                 if (_sec or "").lower().startswith("core") and _k in ("name", "altNames"):
                     for _nm in re.split(r"[,\s]+", _v.strip()):
@@ -1283,8 +1385,25 @@ def run_lint(target, csv_path=None, cn_path=None, jar_path=None):
                             unit_names.add(_nm.lower())
             for line in lines:
                 for expr in re.findall(r"\$\{([^}]*)\}", line):
-                    for ident in re.findall(r"[A-Za-z_][\w]*", expr):
+                    for ident in re.findall(r"[A-Za-z_][A-Za-z0-9_]*", expr):
                         referenced.add(ident.lower())
+
+        # ---- 缓存准备 -------------------------------------------------
+        cross_sets = dict(all_sections=all_sections, global_defines=all_defines,
+                          referenced=referenced, unit_names=unit_names)
+        issue_cache = None
+        scope = ""
+        digests = {}
+        if incremental and rw_cache is not None:
+            issue_cache = rw_cache.IssueCache(
+                _data_signature(csv_path, cn_path, jar_path,
+                                tb["text_path"], len(jar_keys)),
+                enabled=True)
+            if issue_cache.enabled:
+                # scope 把「扫单文件」和「扫整个目录」区分开：
+                # 两者看到的跨文件集合不同，结论不能互相复用。
+                scope = rw_cache.digest(sorted(os.path.abspath(f) for f in files))
+                digests = {k: rw_cache.digest(sorted(v)) for k, v in cross_sets.items()}
 
         all_issues = []
         for f in parsed:
@@ -1292,14 +1411,49 @@ def run_lint(target, csv_path=None, cn_path=None, jar_path=None):
             mv = read_min_version(mod_info)
             has_tpl = bool(mod_root_dir and os.path.isfile(
                 os.path.join(mod_root_dir, "all-units.template")))
-            all_issues += check_file(f, known, csv_keys, mv, all_sections, root, all_defines,
-                                     referenced, canon, unit_names, key_families, has_tpl,
-                                     key_templates)
+            ctx = "%s|%d" % (mv, 1 if has_tpl else 0)
+
+            if issue_cache is not None:
+                hit = issue_cache.lookup(f, scope, ctx, cross_sets, digests)
+                if hit is not None:
+                    all_issues += [Issue(lv, cd, f, ln, ms) for lv, cd, ln, ms in hit]
+                    continue
+
+            if issue_cache is not None:
+                probes = rw_cache.make_probe_sets(cross_sets)
+                try:
+                    iss = check_file(
+                        f, known, csv_keys, mv, probes["all_sections"], root,
+                        probes["global_defines"], probes["referenced"], canon,
+                        probes["unit_names"], key_families, has_tpl, key_templates,
+                        parsed=parsed[f])
+                except Exception:
+                    # 检查中途抛异常时探针是残缺的，宁可不算缓存
+                    all_issues += check_file(
+                        f, known, csv_keys, mv, all_sections, root, all_defines,
+                        referenced, canon, unit_names, key_families, has_tpl,
+                        key_templates, parsed=parsed[f])
+                else:
+                    issue_cache.store(f, scope, ctx, iss,
+                                      {k: v.probes for k, v in probes.items()})
+                    all_issues += iss
+            else:
+                all_issues += check_file(
+                    f, known, csv_keys, mv, all_sections, root, all_defines,
+                    referenced, canon, unit_names, key_families, has_tpl,
+                    key_templates, parsed=parsed[f])
 
         all_issues.sort(key=lambda i: (i.path, i.line))
         res["issues"] = all_issues
         res["errors"] = sum(1 for i in all_issues if i.level == "error")
         res["warnings"] = sum(1 for i in all_issues if i.level == "warning")
+
+        if issue_cache is not None:
+            issue_cache.save()
+            st = issue_cache.stats()
+            st["parse"] = _PARSE_MEMO.stats() if _PARSE_MEMO is not None else None
+            res["cache"] = st
+        res["elapsed_ms"] = int((time.perf_counter() - t_start) * 1000)
         return res
     except Exception as e:
         res["ok"] = False
@@ -1329,6 +1483,9 @@ def main():
     ap.add_argument("--json", action="store_true", help="输出 JSON")
     ap.add_argument("--ref", action="store_true",
                     help="打印速查表（事件名 / 函数 / 枚举 / 内存类型）后退出")
+    ap.add_argument("--no-cache", action="store_true",
+                    help="不复用缓存，强制全量重算（怀疑缓存有错时用）")
+    ap.add_argument("--timing", action="store_true", help="额外打印耗时与缓存命中")
     args = ap.parse_args()
 
     if args.ref:
@@ -1338,7 +1495,8 @@ def main():
     if not args.target:
         ap.error("需要指定要检查的文件或目录（或用 --ref 查看速查表）")
 
-    res = run_lint(args.target, args.csv, args.cn, args.jar)
+    res = run_lint(args.target, args.csv, args.cn, args.jar,
+                   incremental=not args.no_cache)
     if not res["ok"]:
         print("错误：" + str(res["error"]), file=sys.stderr)
         return 1
@@ -1351,6 +1509,8 @@ def main():
 
     if args.json:
         print(json.dumps(dict(files=res["files"], errors=len(errors), warnings=len(warns),
+                              elapsed_ms=res.get("elapsed_ms", 0),
+                              cache=res.get("cache"),
                               issues=[i.as_dict() for i in all_issues]),
                          ensure_ascii=False, indent=2))
     else:
@@ -1370,6 +1530,19 @@ def main():
         if not errors and not warns:
             print("干净，没发现问题。")
         print(f"\n合计：{len(errors)} 个错误，{len(warns)} 个警告")
+
+    if args.timing:
+        c = res.get("cache") or {}
+        print("\n耗时 %d ms；文件 %d 个" % (res.get("elapsed_ms", 0), res.get("files", 0)))
+        if c.get("enabled"):
+            print("结果缓存：命中 %d / 未命中 %d（复用了 %d 个文件的结论）"
+                  % (c.get("hits", 0), c.get("misses", 0), c.get("reused_files", 0)))
+            p = c.get("parse") or {}
+            if p:
+                print("解析缓存：命中 %d / 未命中 %d"
+                      % (p.get("hits", 0), p.get("misses", 0)))
+        else:
+            print("缓存：未启用")
 
     return 1 if errors else 0
 

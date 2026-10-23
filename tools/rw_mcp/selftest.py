@@ -123,9 +123,13 @@ def run_direct():
     if os.path.isdir(koc):
         r = impl.lint("Kings of Cards")
         check("lint(Kings of Cards) 通过", r.get("ok") is True, r.get("error"))
-        check("  → 15 文件 / 0 错误 / 16 警告",
-              (r.get("files"), r.get("errors"), r.get("warnings")) == (15, 0, 16),
+        # 16 -> 15：二进制键名表收录了 stackHorizontal，它不再是「未知键」
+        check("  → 15 文件 / 0 错误 / 15 警告",
+              (r.get("files"), r.get("errors"), r.get("warnings")) == (15, 0, 15),
               (r.get("files"), r.get("errors"), r.get("warnings")))
+        check("  → 带 elapsed_ms / scanned_files",
+              isinstance(r.get("elapsed_ms"), int) and r.get("scanned_files") == 15,
+              (r.get("elapsed_ms"), r.get("scanned_files")))
     else:
         print("  SKIP  lint(Kings of Cards)：本地没有这个模组目录")
 

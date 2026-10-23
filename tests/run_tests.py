@@ -13,9 +13,12 @@
 """
 
 import io
+import json
 import os
 import re
+import shutil
 import sys
+import tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
@@ -28,6 +31,10 @@ rw_lint = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(rw_lint)
 
 FIX = os.path.join(HERE, "fixtures")
+
+# 测试用独立的缓存目录：不污染用户真实缓存，CI 上也保证从零开始
+_CACHE_TMP = tempfile.mkdtemp(prefix="rwlint-cache-")
+os.environ["RW_LINT_CACHE_DIR"] = _CACHE_TMP
 
 # 每个样本：期望的**精确**规则集合（多报、少报都算失败）
 CASES = [
@@ -138,6 +145,162 @@ def check_key_families():
     return ok, bad
 
 
+# ---------------------------------------------------------------- 缓存与增量
+
+def _sig(res):
+    return sorted((i.level, i.code, i.path, i.line, i.msg) for i in res["issues"])
+
+
+def check_cache_equivalence():
+    """缓存结果必须与全量重算逐条一致 —— 这是缓存唯一真正重要的性质。"""
+    ok = bad = 0
+    for t in (FIX, os.path.join(ROOT, "示例"), os.path.join(ROOT, "minesweeper"),
+              os.path.join(ROOT, "Kings of Cards")):
+        if not os.path.exists(t):
+            print("  SKIP  %-28s 目录不存在" % os.path.basename(t))
+            continue
+        full = rw_lint.run_lint(t, incremental=False)
+        cold = rw_lint.run_lint(t, incremental=True)
+        hot = rw_lint.run_lint(t, incremental=True)
+        name = os.path.basename(t)
+        if _sig(full) == _sig(cold) == _sig(hot):
+            print("  PASS  %-28s 全量=%dms 冷=%dms 热=%dms 结论一致"
+                  % (name, full["elapsed_ms"], cold["elapsed_ms"], hot["elapsed_ms"]))
+            ok += 1
+        else:
+            print("  FAIL  %-28s 缓存结论与全量不一致" % name)
+            bad += 1
+    return ok, bad
+
+
+def check_cache_incremental():
+    """只改一个文件时，只有那一个文件该重算。"""
+    ok = bad = 0
+    body = io.open(os.path.join(FIX, "good_minimal.ini"), encoding="utf-8").read()
+    n = 30
+    tmp = tempfile.mkdtemp(prefix="rwlint-inc-")
+    try:
+        os.makedirs(os.path.join(tmp, "units"))
+        io.open(os.path.join(tmp, "mod-info.txt"), "w", encoding="utf-8").write(
+            "title: t\nminVersion: 1.15\n")
+        for i in range(n):
+            io.open(os.path.join(tmp, "units", "u%02d.ini" % i), "w",
+                    encoding="utf-8", newline="\n").write(body)
+
+        rw_lint.run_lint(tmp, incremental=True)
+        r2 = rw_lint.run_lint(tmp, incremental=True)
+        total = n + 1                     # n 个单位文件 + mod-info.txt
+        if r2["cache"]["hits"] == total and r2["cache"]["misses"] == 0:
+            print("  PASS  %-28s 未改动时 %d 个文件全命中" % ("增量", total))
+            ok += 1
+        else:
+            print("  FAIL  %-28s 未改动时 hits=%d misses=%d（期望 %d/0）"
+                  % ("增量", r2["cache"]["hits"], r2["cache"]["misses"], total))
+            bad += 1
+
+        io.open(os.path.join(tmp, "units", "u07.ini"), "a",
+                encoding="utf-8", newline="\n").write("\n# 改一行\n")
+        r3 = rw_lint.run_lint(tmp, incremental=True)
+        full = rw_lint.run_lint(tmp, incremental=False)
+        if r3["cache"]["misses"] == 1 and _sig(r3) == _sig(full):
+            print("  PASS  %-28s 改 1 个文件只重算 1 个" % "增量")
+            ok += 1
+        else:
+            print("  FAIL  %-28s 改 1 个文件 misses=%d（期望 1）"
+                  % ("增量", r3["cache"]["misses"]))
+            bad += 1
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    return ok, bad
+
+
+def check_cache_cross_file():
+    """改 A 必须让依赖 A 的 B 也重算 —— 缓存最危险的地方就在这里。"""
+    ok = bad = 0
+    tmp = tempfile.mkdtemp(prefix="rwlint-x-")
+    try:
+        os.makedirs(os.path.join(tmp, "units"))
+        io.open(os.path.join(tmp, "mod-info.txt"), "w", encoding="utf-8").write(
+            "title: t\nminVersion: 1.15\n")
+        a = os.path.join(tmp, "units", "a.ini")
+        b = os.path.join(tmp, "units", "b.ini")
+        io.open(a, "w", encoding="utf-8", newline="\n").write(
+            "[core]\nname: foo\ndisplayText: F\ndisplayText_zh: 甲\nprice: 10\nmaxHp: 10\n")
+        io.open(b, "w", encoding="utf-8", newline="\n").write(
+            "[core]\nname: bar\ndisplayText: B\ndisplayText_zh: 乙\n[canBuild]\nname: foo\n")
+
+        rw_lint.run_lint(tmp, incremental=True)            # 先建立缓存
+        io.open(a, "w", encoding="utf-8", newline="\n").write(
+            "[core]\nname: foo2\ndisplayText: F\ndisplayText_zh: 甲\nprice: 10\nmaxHp: 10\n")
+        got = rw_lint.run_lint(tmp, incremental=True)
+        full = rw_lint.run_lint(tmp, incremental=False)
+        has_w11 = any(i.code == "11" for i in got["issues"])
+        if has_w11 and _sig(got) == _sig(full):
+            print("  PASS  %-28s 改 A 后 B 被重算并报出 W11" % "跨文件依赖")
+            ok += 1
+        else:
+            print("  FAIL  %-28s W11=%s 与全量一致=%s"
+                  % ("跨文件依赖", has_w11, _sig(got) == _sig(full)))
+            bad += 1
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    return ok, bad
+
+
+def check_bootstrap_marker():
+    """就绪标记：命中不启子进程；spec 变了或包目录没了必须失效。"""
+    ok = bad = 0
+    try:
+        spec2 = importlib.util.spec_from_file_location(
+            "rw_bootstrap", os.path.join(ROOT, "rw-modding-mcp", "bootstrap.py"))
+        bs = importlib.util.module_from_spec(spec2)
+        spec2.loader.exec_module(bs)
+    except Exception as e:                                  # noqa: BLE001
+        print("  SKIP  %-28s 加载失败：%s" % ("bootstrap", e))
+        return 0, 0
+
+    tmp = tempfile.mkdtemp(prefix="rwlint-boot-")
+    try:
+        pkg = os.path.join(tmp, "mcp")
+        os.makedirs(pkg)
+        io.open(os.path.join(pkg, "__init__.py"), "w").write("")
+        marker = os.path.join(tmp, ".deps-ready")
+        bs.READY_MARKER = marker
+
+        cases = [
+            ("无标记", False, None),
+            ("spec 不匹配", False, {"spec": "mcp>=1,<2", "mcp_package": pkg}),
+            ("包目录不存在", False,
+             {"spec": bs.REQUIRED_SPEC, "mcp_package": os.path.join(tmp, "nope")}),
+            ("正常命中", True, {"spec": bs.REQUIRED_SPEC, "mcp_package": pkg}),
+        ]
+        for name, want, content in cases:
+            if os.path.isfile(marker):
+                os.remove(marker)
+            if content is not None:
+                io.open(marker, "w", encoding="utf-8").write(json.dumps(content))
+            got = bs._deps_ready_cached()
+            if got == want:
+                print("  PASS  %-28s 返回 %s" % ("就绪标记/" + name, got))
+                ok += 1
+            else:
+                print("  FAIL  %-28s 期望 %s 实际 %s" % ("就绪标记/" + name, want, got))
+                bad += 1
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    return ok, bad
+
+
+def check_cache():
+    ok = bad = 0
+    for fn in (check_cache_equivalence, check_cache_incremental,
+               check_cache_cross_file, check_bootstrap_marker):
+        a, b = fn()
+        ok += a
+        bad += b
+    return ok, bad
+
+
 def check_workflows():
     """校验 .github/workflows/*.yml 能被 YAML 解析。
 
@@ -229,6 +392,11 @@ def main():
     e_ok, e_bad = check_explain()
     passed += e_ok
     failed += e_bad
+
+    print("\n-- 缓存与增量 --")
+    c_ok, c_bad = check_cache()
+    passed += c_ok
+    failed += c_bad
 
     print("\n-- 工作流 --")
     w_ok, w_bad = check_workflows()

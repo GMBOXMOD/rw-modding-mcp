@@ -11,7 +11,7 @@
 | `lookup_key` | 查一个 luke 键：规范拼写、所属节、版本、值类型、中英文说明与例子；拼错时给近似建议 |
 | `search_source` | 在反编译的 Java 源码里搜索，返回文件、行号、匹配行 |
 | `get_ref` | 结构化速查表：18 个合法事件、27 个逻辑函数、枚举、内存类型、必须配对使用的键、硬限制 |
-| `lint` | 对模组文件或目录跑静态检查，返回结构化错误/警告 |
+| `lint` | 对模组文件或目录跑静态检查；支持批量 `paths`，未改动的文件复用上次结论 |
 | `explain_actions` | 画出 事件/autoTrigger → 动作 → alsoTriggerAction 的调用图，标 repeat / 条件 / memory 读写，并做四条静态检查 |
 
 **全部只读**，不会改你的文件。
@@ -62,6 +62,79 @@ python bootstrap.py --check     # 看环境缺什么
 
 > `command` 用 `python` 就行（PATH 里有即可），也可以用绝对路径。
 > 不需要设 `cwd` —— 启动器从自身位置推断仓库根目录。
+
+## 性能
+
+改完一个文件就想立刻看到结果，所以这部分单独说明。
+
+### 实测（Windows 11 / 180–1000 文件的模组）
+
+| 场景 | 优化前 | 优化后 |
+|---|---|---|
+| 冷启动到第一次 lint 返回（19 文件） | 6.14 s | **约 2.4 s** |
+| 其中 `initialize` | 5.88 s | **2.30 s** |
+| lint 5 个文件（示例集） | 53 ms | **7 ms** |
+| lint 19 个文件（minesweeper） | 86 ms | **18 ms** |
+| lint 1037 个文件（FanWar） | 3300 ms | **605 ms** |
+| 1037 文件里改 1 个再 lint | 3300 ms | **约 640 ms** |
+
+### 做了什么
+
+**1. 探活不再 import 包。** 原来 `has_module()` 用真 `import mcp` 探依赖，而
+`import mcp` 会连带加载 pydantic 等依赖，实测 1.8 s —— 启动时这笔钱要付两遍
+（探活用一次，服务进程再用一次）。现在探活只用 `find_spec`，并且装好之后落一个
+`.venv/.deps-ready` 标记，正常启动完全不启子进程。
+
+**2. 每个文件不再被解析两遍。** `check_file()` 内部又调了一次 `parse_file()`，
+现在共用一个带 mtime 记忆的解析结果。
+
+**3. 数据表记忆化。** 三份键名资料共约 500 KB，解析约 50 ms。
+长驻服务每次 lint 都要付一遍，现在表没变就直接复用。
+
+**4. 逐文件结果缓存。** 未改动的文件直接复用上次结论。
+危险的地方在于**跨文件依赖**：改 A 文件可能让 B 文件的结论变化
+（比如 B 的 `[canBuild] name:` 指向 A 里定义的单位）。
+所以缓存里存的是「这个文件上次对跨文件集合做过的每一次查询及其答案」，
+复用前逐条重放，有一条答案变了就重算那个文件。
+改 A 会让依赖 A 的 B 一起重算，改一个无关文件则只有那一个重算。
+
+**5. 缓存位置**（不写进你的模组目录）：
+
+| 平台 | 位置 |
+|---|---|
+| Windows | `%LOCALAPPDATA%\rw-modding-mcp\lint` |
+| 其它 | `$XDG_CACHE_HOME/rw-modding-mcp/lint` 或 `~/.cache/rw-modding-mcp/lint` |
+
+关闭方式：命令行加 `--no-cache`，或设环境变量 `RW_LINT_CACHE=0`。
+规则文件或数据表一变，整份缓存自动作废（指纹里带了它们的 mtime）。
+
+### 客户端应保持服务进程常驻
+
+这一点很重要：**stdio 模式下每次调用都可能重起一个进程**，
+那样 2.5 s 的启动成本会变成每一次调用的固定开销。
+
+主流客户端（Claude Desktop / Cursor / Cline / VS Code）在会话期间会保持进程存活，
+所以只有第一次慢。如果你的客户端每次都重起，建议改用下面的「快速启动」配置
+把启动成本再压一截。
+
+### 快速启动（跳过启动器）
+
+`bootstrap.py` 负责自动建 venv 和装依赖，但它自己也要起一个 Python 进程（约 0.6 s）。
+依赖装好之后，可以让客户端直接指向 venv 里的解释器：
+
+```json
+{
+  "mcpServers": {
+    "rusted-warfare": {
+      "command": "D:/path/to/rw-modding-mcp/.venv/Scripts/python.exe",
+      "args": ["D:/path/to/rw-modding-mcp/tools/rw_mcp_server.py"]
+    }
+  }
+}
+```
+
+先跑一次 `python bootstrap.py --setup` 确保依赖就绪，再换成这个配置。
+Linux / macOS 把 `Scripts/python.exe` 换成 `bin/python`。
 
 ## explain_actions
 
@@ -166,8 +239,9 @@ tools/
   rw_mcp/
     dataset.py          路径解析 + 数据缓存 + Java 源码索引
     impl.py             五个工具的实现
-    selftest.py         自检（22 项）
+    selftest.py         自检（34 项）
   rw_lint.py            静态检查器（也可单独当命令行用）
+  rw_cache.py           两级缓存：解析记忆 + 带依赖校验的逐文件结果缓存
   game_loadtest.py      进游戏加载测试（无窗口，需要本机装游戏）
 references/             键名资料
 ```
@@ -177,7 +251,9 @@ references/             键名资料
 这些工具不装 MCP 也能用：
 
 ```bash
-python tools/rw_lint.py "D:/path/to/yourmod"        # 静态检查
+python tools/rw_lint.py "D:/path/to/yourmod"        # 静态检查（自动增量）
+python tools/rw_lint.py "D:/path/to/yourmod" --timing  # 顺便看耗时与缓存命中
+python tools/rw_lint.py "D:/path/to/yourmod" --no-cache # 强制全量重算
 python tools/rw_lint.py --ref                        # 打印速查表
 python tools/rw_lint.py --json                       # 机器可读输出
 python tools/rw_mcp/selftest.py                      # 自检
