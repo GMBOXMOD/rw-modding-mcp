@@ -303,6 +303,70 @@ def check_cache():
     return ok, bad
 
 
+# ---------------------------------------------------------------- 返回体积
+
+def _tokens(obj):
+    """粗估 token：中文按 1 字 1 token，ASCII 按 4 字符 1 token。"""
+    s = json.dumps(obj, ensure_ascii=False)
+    cjk = sum(1 for ch in s if "\u4e00" <= ch <= "\u9fff")
+    return cjk + (len(s) - cjk) // 4
+
+
+# 上限给到实测值的 2 倍左右：只拦「明显变胖」，不卡正常增长。
+SIZE_CASES = [
+    ("lint(单文件)",        lambda: _impl().lint(os.path.join(FIX, "good_minimal.ini")), 500),
+    ("lint(fixtures 目录)", lambda: _impl().lint(FIX),                                   2000),
+    ("explain(text)",       lambda: _impl().explain_actions(
+        os.path.join(FIX, "explain_loop_no_reset.ini")),                                  1200),
+]
+
+
+def _impl():
+    from rw_mcp import impl
+    return impl
+
+
+def check_payload_size():
+    """MCP 返回的体积上限。
+
+    踩过一次：issues 每条都带完整绝对路径，200 条重复下来光路径就六千 token；
+    explain_actions 同时返回 text 和 nodes，一张图付两遍钱。
+    这里把体积钉住，以后谁加字段都要先过这一关。
+    """
+    ok = bad = 0
+    try:
+        impl = _impl()
+    except Exception as e:                                  # noqa: BLE001
+        print("  SKIP  返回体积（导入 rw_mcp 失败：%s）" % e)
+        return 0, 0
+
+    for name, fn, limit in SIZE_CASES:
+        try:
+            got = _tokens(fn())
+        except Exception as e:                              # noqa: BLE001
+            print("  FAIL  %-22s 调用失败：%s" % (name, e))
+            bad += 1
+            continue
+        if got <= limit:
+            print("  PASS  %-22s %d token（上限 %d）" % (name, got, limit))
+            ok += 1
+        else:
+            print("  FAIL  %-22s %d token 超过上限 %d" % (name, got, limit))
+            bad += 1
+
+    # 结构约束：issues 里不能再出现完整路径
+    r = impl.lint(os.path.join(FIX, "good_minimal.ini"))
+    flat = all("f" in i and "file" not in i for i in r.get("issues", []))
+    has_files = isinstance(r.get("issue_files"), list)
+    if flat and has_files:
+        print("  PASS  %-22s issues 用下标引用文件，不重复路径" % "lint 返回结构")
+        ok += 1
+    else:
+        print("  FAIL  %-22s issues 里又出现了路径字段" % "lint 返回结构")
+        bad += 1
+    return ok, bad
+
+
 def check_workflows():
     """校验 .github/workflows/*.yml 能被 YAML 解析。
 
@@ -399,6 +463,11 @@ def main():
     c_ok, c_bad = check_cache()
     passed += c_ok
     failed += c_bad
+
+    print("\n-- 返回体积 --")
+    s_ok, s_bad = check_payload_size()
+    passed += s_ok
+    failed += s_bad
 
     print("\n-- 工作流 --")
     w_ok, w_bad = check_workflows()

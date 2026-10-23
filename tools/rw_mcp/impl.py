@@ -306,19 +306,18 @@ def search_source(pattern, regex=False, case_sensitive=False,
 # ---------------------------------------------------------------- explain_actions
 
 
-def explain_actions(path, action=None):
+def explain_actions(path, action=None, fmt="text"):
     def run():
         t0 = time.perf_counter()
         target, tried = resolve_target(path)
         if target is None:
             return {"ok": False, "error": "路径不存在", "tried": tried}
         res = rw_explain.explain(target, action, as_json=True)
-        res["elapsed_ms"] = int((time.perf_counter() - t0) * 1000)
         if not res.get("ok"):
+            res["elapsed_ms"] = int((time.perf_counter() - t0) * 1000)
             return res
-        # 给调用方一个直接可读的文本版，JSON 版保留完整结构
-        res["text"] = rw_explain.render_text(res, action)
-        res["summary"] = {
+
+        summary = {
             "actions": sum(1 for n in res["nodes"].values()
                            if n["kind"] in ("action", "hiddenAction")),
             "entries": len(res["entries"]),
@@ -326,7 +325,26 @@ def explain_actions(path, action=None):
             "by_rule": {r: sum(1 for f in res["findings"] if f["rule"] == r)
                         for r in sorted({f["rule"] for f in res["findings"]})},
         }
-        return res
+        text = rw_explain.render_text(res, action)
+        elapsed = int((time.perf_counter() - t0) * 1000)
+
+        mode = (fmt or "text").lower()
+        if mode in ("json", "both"):
+            out = dict(res)
+            out.pop("text", None)
+            out["summary"] = summary
+            out["elapsed_ms"] = elapsed
+            if mode == "both":
+                out["text"] = text
+            return out
+
+        # 默认只给文本图。整份 nodes 是同一张图的 JSON 形态，两样都返回等于
+        # 让调用方为一张图付两遍钱（实测 3078 → 700 左右）。
+        return {
+            "ok": True, "file": res.get("file"), "text": text,
+            "findings": res.get("findings") or [],
+            "summary": summary, "elapsed_ms": elapsed,
+        }
 
     return _safe("explain_actions", run)
 
@@ -354,9 +372,9 @@ def get_ref():
 # ---------------------------------------------------------------- lint
 
 
-def lint(path="", only="all", max_issues=200, paths=None):
+def lint(path="", only="all", max_issues=100, paths=None):
     def run():
-        n_max = _clamp(max_issues, 1, 1000, 200)
+        n_max = _clamp(max_issues, 1, 1000, 100)
 
         # 批量：一次调用检查多个文件/目录，省掉 agent 来回往返
         raw_targets = list(paths) if paths else ([path] if path else [])
@@ -411,23 +429,42 @@ def lint(path="", only="all", max_issues=200, paths=None):
         shown.sort(key=lambda i: (i.path, i.line))
         dur = int((time.perf_counter() - t0) * 1000)
 
+        # 每条 issue 都带一遍完整绝对路径太贵了：62 字符的路径重复 200 次，
+        # 光路径就吃掉六千多 token。改成「文件表 + 下标」，路径只出现一次。
+        picked = shown[:n_max]
+        file_idx, file_list = {}, []
+        for it in picked:
+            key = it.path
+            if key not in file_idx:
+                file_idx[key] = len(file_list)
+                try:
+                    file_list.append(os.path.relpath(key, dataset.ROOT))
+                except ValueError:            # 跨盘符，relpath 会抛
+                    file_list.append(key)
+
         out = {
             "ok": True,
             "target": resolved[0][1] if len(resolved) == 1 else None,
             "targets": per_target,
             "files": scanned, "scanned_files": scanned,
             "errors": errors, "warnings": warnings,
-            "issues": [i.as_dict() for i in shown[:n_max]],
-            "issues_total": len(shown), "issues_returned": min(len(shown), n_max),
+            "issue_files": file_list,
+            "issues": [{"f": file_idx[i.path], "line": i.line, "code": i.code,
+                        "level": i.level, "message": i.msg} for i in picked],
+            "issues_total": len(shown), "issues_returned": len(picked),
             "truncated": len(shown) > n_max,
+            # 按规则号汇总。被截断时也能一眼看出问题分布，决定要不要缩小范围再查。
+            # 统计的是**过滤后**的集合，和 issues_total 口径一致。
+            "by_code": {c: n for c, n in sorted(
+                ((c, sum(1 for i in shown if i.code == c))
+                 for c in {i.code for i in shown}))},
             "skipped": skipped,
             "elapsed_ms": dur, "duration_ms": dur,
             "cache": cache_tot,
         }
         if len(resolved) == 1:
-            # 单目标时保留键名资料与资源路径，批量时没有单一含义就省略
+            # 单目标时保留键名资料，批量时没有单一含义就省略
             out["key_sources"] = last.get("key_sources") or {}
-            out["assets"] = last.get("assets") or {}
         if missing:
             out["missing"] = missing
         return out

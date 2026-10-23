@@ -68,6 +68,8 @@ python tools/rw_explain.py "path/to/unit.ini" --action scanThreatSlot   # 只看
 python tools/rw_explain.py "path/to/unit.ini" --json
 ```
 
+MCP 里默认只返回文本图，要完整结构传 `fmt="json"`。
+
 报这六条：
 
 | 规则 | 查什么 |

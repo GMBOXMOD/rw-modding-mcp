@@ -44,10 +44,12 @@ def search_source(pattern: str, regex: bool = False, case_sensitive: bool = Fals
 
 
 @mcp.tool()
-def explain_actions(path: str, action: str = "") -> dict:
+def explain_actions(path: str, action: str = "", fmt: str = "text") -> dict:
     """把事件/autoTrigger → 动作 → alsoTriggerAction 的调用图画出来，标 repeat 次数、门控条件、
-    @memory 读写；并做四条静态检查（循环变量复位与推进、不可达动作、未初始化 memory、下标上界）。"""
-    return impl.explain_actions(path, action or None)
+    @memory 读写；并做四条静态检查（循环变量复位与推进、不可达动作、未初始化 memory、下标上界）。
+
+    fmt: text（默认，只返回文本图 + 发现）/ json（返回完整结构）/ both。"""
+    return impl.explain_actions(path, action or None, fmt)
 
 
 @mcp.tool()
@@ -57,10 +59,11 @@ def get_ref() -> dict:
 
 
 @mcp.tool()
-def lint(path: str = "", only: str = "all", max_issues: int = 200,
+def lint(path: str = "", only: str = "all", max_issues: int = 100,
          paths: list[str] | None = None) -> dict:
     """对模组文件或目录跑静态检查，返回结构化的 issues（错误/警告、文件、行号、说明）。
 
+    issues 里的 f 是 issue_files 的下标，不是路径 —— 路径只在 issue_files 里出现一次。
     改完一个文件再跑时，未改动的文件直接复用上次结论（会先校验跨文件依赖），
     返回里的 elapsed_ms / scanned_files / cache 可以直接看出省了多少。
     paths 可一次传多个文件，省掉多次往返。"""
