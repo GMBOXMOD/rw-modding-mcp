@@ -33,6 +33,8 @@ import os
 import re
 import sys
 
+from rw_lint import iter_config_lines
+
 TRIGGER_EVENT = "autoTriggerOnEvent"
 TRIGGER_PERIODIC = "autoTrigger"
 GATE_KEYS = ("alsoTriggerOrQueueActionConditional", "alsoTriggerActionConditional")
@@ -54,25 +56,11 @@ NOT_CHECKED = [
 # ---------------------------------------------------------------- 解析
 
 def _parse_sections(lines):
-    """自己解析节与键值。
-
-    不能直接用 rw_lint.parse_file 的 entries：它把块写法的值记成三个引号本身，
-    块里的内容不会拼进去，而 setUnitMemory 基本都是块写法。
-    """
-    sections = {}
-    order = []
-    comments = []
+    """与 lint 共用三引号解析，同时保留动作图所需的行尾注释诊断。"""
+    sections, order, comments = {}, [], []
     cur = None
-    i, n = 0, len(lines)
-    while i < n:
-        raw = lines[i]
+    for line_no, raw in iter_config_lines(lines):
         st = raw.strip()
-        line_no = i + 1
-        i += 1
-
-        if not st or st.startswith("#"):
-            continue
-
         m = re.match(r"^\[(.+?)\]\s*$", st)
         if m:
             cur = m.group(1).strip()
@@ -80,40 +68,17 @@ def _parse_sections(lines):
                 sections[cur] = {}
                 order.append((cur, line_no))
             continue
-
         if cur is None or st.startswith("@"):
             continue
-        if ":" not in st:
+        m = re.match(r"^([^:=]+?)\s*[:=]\s*(.*)$", st)
+        if not m:
             continue
-
-        key, _, val = st.partition(":")
-        key = key.strip()
-        val = val.strip()
-
-        if val.startswith('"""'):
-            body = val[3:]
-            if '"""' in body:                          # 单行块
-                val = body.split('"""')[0]
-            else:                                      # 多行块
-                buf = [body] if body.strip() else []
-                while i < n:
-                    ln = lines[i]
-                    i += 1
-                    if '"""' in ln:
-                        head = ln.split('"""')[0]
-                        if head.strip():
-                            buf.append(head)
-                        break
-                    buf.append(ln)
-                val = "\n".join(buf)
-        elif " #" in val:
-            # 行尾注释。引擎其实**不剥**行尾 #（只跳过整行以 # 开头的），
-            # 这里为了能画出图，按去掉注释后的值解析，同时记一条告警。
+        key, val = m.group(1).strip(), m.group(2).strip()
+        if " #" in val:
+            # 引擎不剥行尾注释；为画图先移除，同时明确报告。
             comments.append({"line": line_no, "section": cur, "key": key, "raw": val})
             val = val.split(" #", 1)[0].rstrip()
-
         sections[cur].setdefault(key, []).append((line_no, val))
-
     return sections, order, comments
 
 
@@ -121,7 +86,7 @@ def _scan_directives(lines, comments=None):
     """@memory / @global 声明。@global 的值同样要剥行尾注释，
     否则 `@global SLOTS: 4 # 槽数` 会让 repeat 解析不出来，整条循环分析被跳过。"""
     mem, glob = {}, {}
-    for idx, line in enumerate(lines, 1):
+    for idx, line in iter_config_lines(lines):
         st = line.strip()
         m = re.match(r"^@memory\s+([A-Za-z_]\w*)\s*:\s*(\S+)", st)
         if m:
@@ -190,7 +155,17 @@ def _parse_setunitmemory(value):
 
 
 def _mem_reads(text):
-    return set(re.findall(r"memory\.([A-Za-z_]\w*)", text or ""))
+    text = text or ""
+    reads = set(re.findall(r"\bmemory\.([A-Za-z_]\w*)", text))
+    # 函数式读取也适用于条件，不只适用于 memory 赋值。
+    for call in re.finditer(r"\breadUnitMemory\s*\(([^()]*)\)", text):
+        args = call.group(1)
+        named = re.search(r"\bname\s*=\s*[\"']?([A-Za-z_]\w*)", args)
+        positional = re.match(r"\s*[\"']([A-Za-z_]\w*)[\"']\s*(?:,|$)", args)
+        match = named or positional
+        if match:
+            reads.add(match.group(1))
+    return reads
 
 
 def _array_accesses(text):
@@ -284,15 +259,15 @@ def analyze_file(path):
                     writes.add(base)
                     node["setunitmemory"].append({"base": base, "target": lhs,
                                                   "value": rhs, "via": wk})
-                    node["memory_reads"] |= _mem_reads(rhs)
+                    node["memory_reads"] |= _mem_reads(lhs) | _mem_reads(rhs)
                 for arr, idx in _array_accesses(v):
                     node["array_accesses"].append({"array": arr, "index": idx})
-                # readUnitMemory(name=...) 是函数式读取
-                for nm in re.findall(r"readUnitMemory\s*\(\s*(?:name\s*=\s*)?[\"']?"
-                                     r"([A-Za-z_]\w*)", v):
-                    node["memory_reads"].add(nm)
+        # 触发条件、门控和 repeat 都会读取 memory，必须参与只读未写检查。
+        for key in (TRIGGER_EVENT, TRIGGER_PERIODIC, COND_KEY, REPEAT_KEY) + GATE_KEYS:
+            for _, value in kv.get(key, []):
+                node["memory_reads"] |= _mem_reads(value)
         node["memory_writes"] = sorted(writes)
-        node["memory_reads"] = sorted(node["memory_reads"] | _mem_reads(node["require"] or ""))
+        node["memory_reads"] = sorted(node["memory_reads"])
 
         nodes[sec] = node
 
@@ -315,7 +290,8 @@ def analyze_file(path):
         "file": path,
         "nodes": nodes,
         "inbound": inbound,
-        "entries": [n for n, node in nodes.items() if node["triggers"]],
+        "entries": [n for n, node in nodes.items()
+                    if node["triggers"] or node["kind"] == "action"],
         "findings": findings,
         "memory_declared": {k: v["type"] for k, v in mem_decl.items()},
         "globals": {k: v["value"] for k, v in globals_.items()},
@@ -539,6 +515,8 @@ def render_text(result, action=None):
             head += "   ← %s" % via
         L.append(head)
         sub = pad + "│   "
+        if node["kind"] == "action" and not node["triggers"]:
+            L.append("%strigger: player button" % sub)
         for t in node["triggers"]:
             L.append("%strigger: %s %s" % (sub, t["type"], t["value"]))
         if node["require"]:
