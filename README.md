@@ -170,7 +170,7 @@ python tools/game_loadtest.py "D:/path/to/yourmod"      # 进游戏加载测试�
 .venv/Scripts/python.exe tests/run_tests.py
 ```
 
-真实样本 `示例`、`minesweeper`、`Kings of Cards` 会依次从 `RW_TEST_MOD_ROOTS`、仓库内部、仓库旁边查找。
+真实样本 `example_test` 会依次从 `RW_TEST_MOD_ROOTS`、仓库内部、仓库旁边查找。
 其它位置可用环境变量指定多个父目录（Windows 用分号，Linux/macOS 用冒号）：
 
 ```powershell
