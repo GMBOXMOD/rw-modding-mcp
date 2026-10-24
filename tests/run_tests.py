@@ -253,9 +253,15 @@ def check_cache_cross_file():
 def check_bootstrap_marker():
     """就绪标记：命中不启子进程；spec 变了或包目录没了必须失效。"""
     ok = bad = 0
+    # bootstrap.py 只在仓库里。在项目根跑测试时它不存在 —— 跳过，不是失败。
+    boot = os.path.join(ROOT, "bootstrap.py")
+    if not os.path.isfile(boot):
+        boot = os.path.join(ROOT, "rw-modding-mcp", "bootstrap.py")
+    if not os.path.isfile(boot):
+        print("  SKIP  %-28s 找不到 bootstrap.py（不在仓库目录里）" % "bootstrap")
+        return 0, 0
     try:
-        spec2 = importlib.util.spec_from_file_location(
-            "rw_bootstrap", os.path.join(ROOT, "bootstrap.py"))
+        spec2 = importlib.util.spec_from_file_location("rw_bootstrap", boot)
         bs = importlib.util.module_from_spec(spec2)
         spec2.loader.exec_module(bs)
     except Exception as e:                                  # noqa: BLE001

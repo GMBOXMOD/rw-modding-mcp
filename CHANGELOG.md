@@ -4,6 +4,9 @@ README 只讲「现在是什么、怎么用」。改了什么记在这里。
 
 ## Unreleased
 
+- `tests/run_tests.py` 的 bootstrap 用例改为「找不到 bootstrap.py 就跳过」。
+  原来硬编码 `ROOT/bootstrap.py`，在仓库里跑没问题，在项目根跑就红。
+
 CORE: 基础支持
 
 - `lint` 能从原版 `assets/units` 读取 `copyFrom: CORE:` 的定义；支持自动定位、`RW_CORE_UNITS` 与 CLI `--core-units`。
