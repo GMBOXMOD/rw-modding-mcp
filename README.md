@@ -8,16 +8,53 @@
 
 | 工具 | 作用 |
 |---|---|
-| `lookup_key` | 查 luke 键：规范拼写、所属节、版本、值类型、中英文说明与例子；拼错时给近似建议 |
-| `search_source` | 搜反编译的 Java 源码，返回文件、行号、匹配行 |
-| `get_ref` | 速查表：18 个事件、27 个逻辑函数、枚举、内存类型、必须配对的键、硬限制 |
+| `lookup_key` | 按节查键，默认短释义与例子，保留来源、资料冲突和约束；完整资料按需取 |
+| `search_source` | 批量搜 Java 源码，带有限上下文、分页、空结果诊断和内容预算 |
+| `get_ref` | 按主题和名称查事件、函数、枚举、内存类型与规则；无参数保留完整速查表 |
 | `lint` | 静态检查文件或目录；支持批量 `paths`，未改动的文件复用上次结论 |
-| `explain_actions` | 画 事件/autoTrigger → 动作 → alsoTriggerAction 的调用图，标 repeat、条件、memory 读写 |
+| `explain_actions` | 画 事件/autoTrigger/按钮 → 动作 → alsoTriggerAction 的调用图，标 repeat、条件、memory 读写 |
 
 全部只读，不改你的文件。
 
 查多个键用 `lookup_key(keys=[...])`，检查多个文件用 `lint(paths=[...])`。
-每次工具调用都要把整个上下文重发一遍，所以**少往返比少返回更省钱**。
+批量查询能减少模型往返，精简输出能减少进入上下文的资料量；实际费用取决于客户端、模型和缓存。
+本地 lint 缓存只节省检查时间，不是模型的提示词缓存。MCP 也不能限制客户端的 Bash、子 agent 或模型请求预算。
+
+## 定向查询与返回预算
+
+下面是 MCP 工具参数示例，不需要在终端执行：
+
+```python
+lookup_key(keys=["isVisible", "isActive", "displayType"], section="action")
+lookup_key(key="isVisible", section="action", detail="full")
+get_ref(topic="events", name="killedAnyUnit")
+get_ref(topic="enums", name="movementType")
+get_ref(topic="rules", name="alwaysSinglePress")
+search_source(patterns=["setUnitStats", "setUnitMemory"], path_filter="custom/")
+search_source(pattern="EventSourceReference|teamId", mode="regex")
+```
+
+- `lookup_key` 默认 `detail="brief"`：每个节最多一条短释义/例子，最多展示三个节。
+  长说明标 `truncated`，过长的例子用 `example_omitted` 标明省略，不返回半段配置；未展示的节标 `entries_omitted`。
+  约束、资料冲突和重要说明保留。
+  `section` 接受 `action`、`[action_btn]` 或 `M` 等节名/章节字母。
+  `section_match=false` 表示资料没有确认指定节的用法，不等于该键在引擎里绝对不可用。
+  一次最多 32 个不同的键，重复输入只查一次；`count` 是去重后的数量，`requested_count` 是输入数量。
+- **返回形状变化**：默认模式不再返回原始 `csv` / `cn` 数组，改用 `entries`；依赖原始字段的程序
+  请显式传 `detail="full"`。旧的位置参数保留，完整模式保留原有原始资料字段。
+- `search_source` 默认 `10` 条匹配、前后各 `2` 行（`context_lines` 可设 `0–5`）。
+  `patterns` 一次最多 8 个不同的查询，同一行匹配多个词只返回一次，计数见 `by_pattern`。
+  `mode="literal"` 按原文匹配，找 `%{` 就直接传 `%{`，不要写 `%\{`。
+  正则使用 `mode="regex"`；旧的 `regex=True` 仍可用，但不能与 `mode="literal"` 冲突。
+  `path_filter` 是路径子串而非 glob。空结果看 `reason` / `hints`，不会擅自改模式或扩大范围。
+- 搜索的 `max_chars` 默认 `8000`，范围 `1000–20000`，限制 `matches` 的紧凑 JSON 字符数，
+  **不包含结果元数据，也不是 token 数**。数量或字符预算达到上限时，用 `next_offset` 作为下次的 `offset`。
+  超长匹配行/上下文会标明截短；分页只在进程内源码索引不变时稳定，重新反编译后需重启服务。
+- `get_ref()` 无参数仍返回完整速查表。常用主题：`events`、`functions`、`enums`、`memory`、
+  `sections`、`rules`、`must_pair`、`hard_constraints`。`name` 按名称筛选，需同时指定 `topic`。
+  这轮只查询已有资料；没有新增教程模板，也不把“名称收录”当作运行时语义已验证。
+
+普通单位建议先定向查询，再写文件并检查；是否启动多 agent 或继续源码研究，应由客户端单独征得用户同意并设置预算。
 
 ## 安装
 
@@ -86,6 +123,30 @@ MCP 里默认只返回文本图，要完整结构传 `fmt="json"`。
 
 运行时条件真假、运行时 `repeat`、`copyFrom` 带来的跨文件边、数组真实长度，这些它不查，会在输出末尾列出来。
 
+`lint` 的引用检查按当前单位及其本地继承链隔离，支持相对 `copyFrom`、`ROOT:`、基础 `CORE:` 和最近的
+`all-units.template`。缺失或无法展开的继承（如无法定位原版目录、动态路径）列在 `skipped`，不能视为已经验证。
+此继承支持只用于 `lint`，`explain_actions` 仍只分析单个文件。
+
+## CORE: 基础支持
+
+`copyFrom: CORE:tanks/tank.ini` 从游戏的 `assets/units/tanks/tank.ini` 读取原版配置，
+不是从 `mods/units` 读取。只收集继承链中的节、常量等定义用于引用检查；不会修改、复制原版文件或启动游戏。
+
+定位顺序：CLI 的 `--core-units` 参数、`RW_CORE_UNITS` 环境变量、指定的 game-lib.jar 所在目录
+（`--jar` / `RW_GAME_JAR`）、被检查文件所在的游戏目录、常见安装位置。
+显式 `--core-units` / `RW_CORE_UNITS` 路径无效时不悄悄换到另一份游戏。
+
+```powershell
+.venv/Scripts/python.exe tools/rw_lint.py "D:/path/to/mod" --core-units "D:/path/to/game/assets/units"
+# MCP 客户端则在服务环境中设置 RW_CORE_UNITS，之后重启服务。
+```
+
+- 找不到原版目录时标记未解析；目录已定位但目标缺失、不可读或越界时报告 `E17`。
+- CLI JSON 与 MCP 结果中的 `core` 列出原版目录、引用/已读取/未解析数量。
+- **`core.mode="symbols_only"` 不代表完整单位验证通过**：不计算最终键值合并与覆盖，不执行运行时表达式。
+  仍未检查的范围列在 `core.not_checked`。图片/音频中的 `CORE:`、`SHARED:` 资源路径也不在本轮范围内。
+- 相关原版文件或目录配置变化会使依赖它的检查缓存失效，不让无关单位全部重算。
+
 ## 命令行
 
 不装 MCP 也能用：
@@ -99,6 +160,27 @@ python tools/rw_lint.py --json                          # 机器可读
 python tools/rw_mcp/selftest.py                         # 自检
 python tools/game_loadtest.py "D:/path/to/yourmod"      # 进游戏加载测试（无窗口）
 ```
+
+## 可选测试依赖与外部模组
+
+工作流 YAML 校验需要在运行测试的 Python 环境安装 `PyYAML`，例如：
+
+```powershell
+.venv/Scripts/python.exe -m pip install PyYAML
+.venv/Scripts/python.exe tests/run_tests.py
+```
+
+真实样本 `示例`、`minesweeper`、`Kings of Cards` 会依次从 `RW_TEST_MOD_ROOTS`、仓库内部、仓库旁边查找。
+其它位置可用环境变量指定多个父目录（Windows 用分号，Linux/macOS 用冒号）：
+
+```powershell
+$env:RW_TEST_MOD_ROOTS = "D:/path/to/collection;D:/path/to/game/mods/units"
+.venv/Scripts/python.exe tests/run_tests.py
+.venv/Scripts/python.exe tools/rw_mcp/selftest.py
+```
+
+这些测试只读取模组，验证缓存前后与 CLI/MCP 的结果一致，不代表模组诊断为零，也不等于游戏加载已通过。
+`skipped` 中未展开的继承仍需单独处理；这里不会复制模组或启动游戏。
 
 ## search_source 需要反编译
 

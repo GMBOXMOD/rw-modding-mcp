@@ -25,14 +25,7 @@ import rw_lint  # noqa: E402  （必须先补 sys.path）
 # 默认的游戏安装路径；可用 RW_GAME_JAR 覆盖
 # 游戏安装目录候选：只放**常见默认位置**，不放任何人的个人路径。
 # 优先用 RW_GAME_JAR 环境变量覆盖。
-GAME_CANDIDATES = [
-    r"D://steam//steamapps//common//Rusted Warfare",
-    r"C://Program Files (x86)//Steam//steamapps//common//Rusted Warfare",
-    r"C://Program Files//Steam//steamapps//common//Rusted Warfare",
-    os.path.expanduser(r"~\Steam\steamapps\common\Rusted Warfare"),
-    os.path.expanduser("~/Library/Application Support/Steam/steamapps/common/Rusted Warfare"),
-    os.path.expanduser("~/.steam/steam/steamapps/common/Rusted Warfare"),
-]
+GAME_CANDIDATES = rw_lint.GAME_CANDIDATES
 
 
 def _find_jar():

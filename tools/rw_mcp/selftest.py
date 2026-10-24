@@ -20,6 +20,7 @@ if TOOLS not in sys.path:
     sys.path.insert(0, TOOLS)
 
 from rw_mcp import impl, dataset  # noqa: E402
+from rw_test_support import find_test_mod  # noqa: E402
 
 PASS, FAIL = 0, 0
 
@@ -67,10 +68,10 @@ def run_direct():
           any(s["letter"] == "Q" for s in r.get("sections", [])), r.get("sections"))
     check("  → 版本含 1.15p9", "1.15p9" in (r.get("versions") or []), r.get("versions"))
 
-    r = impl.lookup_key("isVisible")
+    r = impl.lookup_key("isVisible", detail="full")
     check("lookup_key(isVisible) 多条中文释义", len(r.get("cn") or []) >= 4, len(r.get("cn") or []))
 
-    r = impl.lookup_key("displayText")
+    r = impl.lookup_key("displayText", detail="full")
     check("lookup_key(displayText) 命中占位符别名", bool(r.get("cn")), r.get("cn"))
 
     # 归一化兜底：多个候选时必须拒绝猜测，不能静默取第一个
@@ -126,27 +127,30 @@ def run_direct():
     check("get_ref 配对规则 4 条", len(r.get("rules", {}).get("must_pair", [])) == 4)
 
     # 下面两项依赖本地模组目录；别人克隆仓库后没有这些目录，跳过而不是报错
-    koc = os.path.join(dataset.ROOT, "Kings of Cards")
-    if os.path.isdir(koc):
-        r = impl.lint("Kings of Cards")
+    koc = find_test_mod("Kings of Cards", dataset.ROOT)
+    if koc:
+        r = impl.lint(koc)
         check("lint(Kings of Cards) 通过", r.get("ok") is True, r.get("error"))
-        # 16 -> 15：二进制键名表收录了 stackHorizontal，它不再是「未知键」
-        check("  → 15 文件 / 0 错误 / 15 警告",
-              (r.get("files"), r.get("errors"), r.get("warnings")) == (15, 0, 15),
+        # 外部模组不随仓库版本固定；精确规则由 fixtures 保证，这里验证接口一致性。
+        baseline = impl.rw_lint.run_lint(koc, incremental=False)
+        check("  → MCP 与 CLI 文件/错误/警告计数一致",
+              baseline["ok"] and all(r.get(k) == baseline[k] for k in ("files", "errors", "warnings")),
               (r.get("files"), r.get("errors"), r.get("warnings")))
         check("  → 带 elapsed_ms / scanned_files",
-              isinstance(r.get("elapsed_ms"), int) and r.get("scanned_files") == 15,
+              isinstance(r.get("elapsed_ms"), int) and r.get("scanned_files") == baseline["files"],
               (r.get("elapsed_ms"), r.get("scanned_files")))
+        print("  INFO  Kings of Cards：%s 文件 / %s 错误 / %s 警告 / %d 未展开或跳过"
+              % (r.get("files"), r.get("errors"), r.get("warnings"), len(r.get("skipped", []))))
     else:
         print("  SKIP  lint(Kings of Cards)：本地没有这个模组目录")
 
-    ex = os.path.join(dataset.ROOT, "示例")
-    if os.path.isdir(ex):
+    ex = find_test_mod("示例", dataset.ROOT)
+    if ex:
         # 按目录里实际的模板数量断言，而不是写死一个数字 ——
         # 写死的话每加一个示例这里就假红一次（已经发生过两次）。
-        want = len([f for f in os.listdir(ex) if f.lower().endswith(".template")])
-        r = impl.lint("示例")
-        check("lint(示例) 覆盖全部 %d 个模板" % want,
+        want = len(impl.rw_lint.collect_files(ex))
+        r = impl.lint(ex)
+        check("lint(示例) 覆盖全部 %d 个配置文件" % want,
               r.get("ok") is True and r.get("files") == want, r.get("files"))
     else:
         print("  SKIP  lint(示例)：本地没有这个目录")
@@ -222,9 +226,14 @@ async def run_stdio():
         return
 
     server = os.path.join(TOOLS, "rw_mcp_server.py")
+    # 用合成源码做协议断言，不依赖游戏安装或私有反编译产物。
+    source_fixture = os.path.normpath(os.path.join(TOOLS, "..", "tests", "fixtures", "source_search"))
+    protocol_fixture = os.path.normpath(os.path.join(TOOLS, "..", "tests", "protocol_fixtures"))
     params = StdioServerParameters(
         command=sys.executable, args=[server],
-        env={**os.environ, "PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8"})
+        env={**os.environ, "PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8",
+             "RW_JAVA_SRC": source_fixture,
+             "RW_CORE_UNITS": os.path.join(protocol_fixture, "core_units")})
 
     # lint 用 fixtures，保证干净克隆 / CI 里也存在
     lint_target = os.path.normpath(os.path.join(TOOLS, "..", "tests", "fixtures"))
@@ -233,10 +242,19 @@ async def run_stdio():
 
     # (工具名, 参数, 额外要断言的字段)
     cases = [
-        ("lookup_key", {"key": "layer"}, {"found": True, "key": "layer"}),
+        ("lookup_key", {"key": "layer"}, {"found": True, "key": "layer", "detail": "brief"}),
+        ("lookup_key", {"key": "isVisible", "section": "action", "detail": "full"},
+         {"found": True, "section_match": True, "detail": "full"}),
+        ("search_source", {"patterns": ["alpha", "beta"], "context_lines": 1}, {"total_matches": 3}),
+        ("search_source", {"pattern": "alpha|beta", "mode": "regex"}, {"total_matches": 3}),
+        ("search_source", {"pattern": "alpha|beta", "regex": True}, {"total_matches": 3}),
+        ("search_source", {"pattern": r"%\{", "regex": False}, {"total_matches": 0, "reason": "no_match"}),
+        ("get_ref", {"topic": "events", "name": "killedAnyUnit"}, {"found": True, "items": ["killedAnyUnit"]}),
         ("search_source", {"pattern": "addBooleanType", "max_results": 3}, {}),
         ("get_ref", {}, {}),
         ("lint", {"path": lint_target}, {}),
+        ("lint", {"path": os.path.join(protocol_fixture, "core_unit.ini")},
+         {"files": 1, "errors": 0, "warnings": 0}),
         ("explain_actions", {"path": os.path.join(lint_target, "explain_loop_no_reset.ini")}, {}),
     ]
 
@@ -262,6 +280,34 @@ async def run_stdio():
                 check("%s ok=True" % name, d.get("ok") is True, d.get("error"))
                 for k, v in expect.items():
                     check("%s.%s == %r" % (name, k, v), d.get(k) == v, d.get(k))
+
+            # 测 SDK 实际返回的文本，而不是仅估算 impl 字典的体积。
+            keys = ["name", "price", "maxHp", "mass", "radius", "image", "movementType", "canAttack",
+                    "canAttackFlyingUnits", "canAttackLandUnits", "canAttackUnderwaterUnits",
+                    "maxAttackRange", "shootDelay", "projectile", "directDamage", "life", "speed"]
+            brief = await s.call_tool("lookup_key", {"keys": keys})
+            full = await s.call_tool("lookup_key", {"keys": keys, "detail": "full"})
+            b_text = "".join(getattr(c, "text", "") for c in brief.content)
+            f_text = "".join(getattr(c, "text", "") for c in full.content)
+            check("真实协议：17 键 brief 比 full 至少减少 40% 字符",
+                  len(b_text) < len(f_text) * 0.6,
+                  "brief=%d full=%d" % (len(b_text), len(f_text)))
+            check("真实协议：brief 批量不超过 18000 字符", len(b_text) <= 18000, len(b_text))
+            check("真实协议：brief/full 批量都成功",
+                  (_payload(brief) or {}).get("ok") is True and (_payload(full) or {}).get("ok") is True)
+            print("  返回字符数（非计费 token）：brief=%d / full=%d" % (len(b_text), len(f_text)))
+            search = await s.call_tool("search_source", {"pattern": "alpha", "max_results": 1})
+            first = _payload(search) or {}
+            check("真实协议：搜索带上下文和下一页", bool(first.get("matches"))
+                  and "before" in first["matches"][0] and first.get("next_offset") == 1)
+            page = await s.call_tool("search_source", {"pattern": "alpha", "max_results": 1, "offset": 1})
+            second = _payload(page) or {}
+            check("真实协议：分页不重复", bool(second.get("matches"))
+                  and second["matches"][0]["line"] != first["matches"][0]["line"])
+            core_result = await s.call_tool("lint", {"path": os.path.join(protocol_fixture, "core_unit.ini")})
+            core = (_payload(core_result) or {}).get("core", {})
+            check("真实协议：CORE 目标已读取", core.get("resolved") == 1 and core.get("unresolved") == 0)
+            check("真实协议：CORE 明确仅检查定义", core.get("mode") == "symbols_only" and bool(core.get("not_checked")))
 
 
 def run_time():

@@ -44,6 +44,7 @@ luke 语最大的坑是**静默失效**：键名拼错、大小写错、用了�
     E12  addActionCooldownApplyToActions 缺 addActionCooldownTime
     E13  @memory 的类型不合法
     E14  canAttack: true 但缺 canAttackFlyingUnits / LandUnits / UnderwaterUnits
+    E17  已定位原版目录，但 CORE: 目标缺失、不可读或路径非法
 
   W  警告（可能是 bug，也可能是刻意的）
     W01  未知键（三份资料都查不到）
@@ -504,69 +505,69 @@ class Issue:
                     line=self.line, message=self.msg)
 
 
-def parse_file(path, use_cache=True):
-    """返回 (sections, entries, raw_lines)。entries = [(line_no, key, value, section)]
+def iter_config_lines(lines):
+    """产出 (起始行号, 逻辑行)，按引擎语义拼接三引号块。
 
+    块内物理行直接连接；独立的三引号块是注释。普通整行 # 注释只在
+    块外跳过。保留键所在行号，让单行和块写法走完全相同的检查规则。
+    """
+    in_block = False
+    block_comment = False
+    chunks = []
+    start = 0
+    for idx, line in enumerate(lines, 1):
+        line = line.rstrip("\r\n")     # 与 Java readLine 一样去掉物理换行符
+        st = line.strip()
+        if not in_block and (not st or st.startswith("#")):
+            continue
+        if not in_block:
+            start = idx
+            block_comment = st.startswith('"""')
+        if '"""' in line or in_block:
+            chunks.append(line.replace('"""', ""))
+            if line.count('"""') % 2:
+                in_block = not in_block
+            if in_block:
+                continue
+            if not block_comment:
+                yield start, "".join(chunks)
+            chunks = []
+        else:
+            yield idx, line
+    # 未闭合块仍保留键值供其它规则使用；E03 单独报告缺失的结束引号。
+    if chunks and not block_comment:
+        yield start, "".join(chunks)
+
+
+def parse_file(path, use_cache=True):
+    """返回 (sections, entries, lines, raw, directives, defines)。
+
+    entries = [(line_no, key, value, section)]，value 包含完整的三引号块。
     带进程内记忆：按 (绝对路径, mtime_ns, 大小) 命中。
-    check_file 内部也要 parse 一次，两处共用同一份结果 ——
-    否则每个文件会被解析两遍（实测占整个扫描时间的 21%）。
     """
     if use_cache and _PARSE_MEMO is not None:
         hit = _PARSE_MEMO.get(path)
         if hit is not None:
             return hit
-    raw = io.open(path, "rb").read()
-    text = raw.decode("utf-8-sig", "replace")
-    lines = text.split("\n")
+    with io.open(path, "rb") as fh:
+        raw = fh.read()
+    lines = raw.decode("utf-8-sig", "replace").split("\n")
 
-    sections = []          # [(line_no, name)]
-    entries = []           # [(line_no, key, value, section)]
-    directives = {}        # {section: 指令行数}（@memory / @global 也算内容）
-    defines = set()        # 本文件里 @define / @global 声明的名字，它们是可写的键
+    sections, entries = [], []
+    directives, defines = {}, set()
     cur = None
-    in_block = False       # 是否在 """ 块内
-    for idx, line in enumerate(lines, 1):
+    for idx, line in iter_config_lines(lines):
         stripped = line.strip()
-
-        # 注释行先跳过，再数引号 —— 注释里写 `"""` 不该影响块判定
-        # （引擎也是先判注释再判块，见 ab.java:172）
-        if not in_block and stripped.startswith("#"):
-            continue
-
-        # 统计 """ 出现次数（同一行可能开也可能闭）
-        q = stripped.count('"""')
-        if q % 2 == 1:
-            # `@define x:"""` 这种形式：块开始了，但名字照样要登记
-            dm0 = re.match(r"^@(?:define|global)\s+([A-Za-z_][\w]*)", stripped)
-            if dm0 and not in_block:
-                defines.add(dm0.group(1).lower())
-            # `key: """` 这种形式：块虽然开始了，但这个键本身是内容
-            m0 = re.match(r"^([A-Za-z_@][\w@]*)\s*[:=]\s*\"\"\"", stripped)
-            if m0 and not in_block:
-                entries.append((idx, m0.group(1), '"""', cur))
-            in_block = not in_block
-            continue
-        if in_block:
-            continue
-        if q and q % 2 == 0 and q > 0:
-            continue
-
-        if not stripped or stripped.startswith("#"):
-            continue
-
         if stripped.startswith("[") and stripped.endswith("]"):
-            name = stripped[1:-1].strip()
-            sections.append((idx, name))
-            cur = name
+            cur = stripped[1:-1].strip()
+            sections.append((idx, cur))
             continue
-
         if stripped.startswith(DIRECTIVE):
             directives[cur] = directives.get(cur, 0) + 1
             dm = re.match(r"^@(?:define|global)\s+([A-Za-z_][\w]*)", stripped)
             if dm:
                 defines.add(dm.group(1).lower())
             continue
-
         m = re.match(r"^([A-Za-z_@][\w@]*)\s*([:＝：=])\s*(.*)$", stripped)
         if m:
             entries.append((idx, m.group(1), m.group(3), cur))
@@ -604,51 +605,32 @@ def check_file(path, known, csv_keys, min_version, all_sections, mod_root,
         issues.append(Issue("error", "03", path, 1,
                             f'`"""` 出现 {n_q} 次（奇数）。它会吞掉后面整段配置，必须成对'))
 
-    # E02 全角冒号 / E04 花括号
-    depth = 0
-    in_block = False
-    for idx, line in enumerate(lines, 1):
+    # E02 全角冒号 / E04 花括号：每个逻辑值独立配对，不能相互抵消。
+    logical_lines = list(iter_config_lines(lines))
+    for idx, line in logical_lines:
         s = line.strip()
-        # 跟踪 """ 块：块内的内容是数据，不参与语法检查
-        q = s.count('"""')
-        if q % 2 == 1:
-            in_block = not in_block
-            continue
-        if in_block or q:
-            continue
-        if not s or s.startswith("#"):
-            continue
         if re.match(r"^[A-Za-z_@][\w@]*\s*：", s):
             issues.append(Issue("error", "02", path, idx,
                                 "用了全角冒号 `：`，必须改成半角 `:`"))
-        # 用括号栈扫描，正确处理 %{ ... ${...} ... } 这种嵌套
         stack = []
         i = 0
         while i < len(s):
-            if s.startswith("${", i):
-                stack.append("v")
-                i += 2
-            elif s.startswith("%{", i):
-                stack.append("t")
+            if s.startswith("${", i) or s.startswith("%{", i):
+                stack.append(s[i:i + 2])
                 i += 2
             elif s[i] == "}":
                 if stack:
-                    kind = stack.pop()
-                    if kind == "v":
-                        depth -= 1
+                    stack.pop()
                 else:
                     issues.append(Issue("error", "04", path, idx, "多余的 `}`"))
                     break
                 i += 1
             else:
                 i += 1
-        for kind in stack:
-            if kind == "v":
-                depth += 1
-        if depth < 0:
-            depth = 0
-    if depth != 0:
-        issues.append(Issue("error", "04", path, len(lines), f"`${{` 未闭合（差 {depth} 个）"))
+        if stack:
+            kinds = " / ".join(sorted(set(stack)))
+            issues.append(Issue("error", "04", path, idx,
+                                f"`{kinds}` 未闭合（差 {len(stack)} 个）"))
 
     # E05 重复节头
     seen = {}
@@ -744,7 +726,7 @@ def check_file(path, known, csv_keys, min_version, all_sections, mod_root,
     # 依据：不带点、不带括号的 `${x}` 只能是 @global / @define 声明的名字
     declared = set(defines) | {d.lower() for d in global_defines}
     _seen_w09 = set()
-    for idx, line in enumerate(lines, 1):
+    for idx, line in logical_lines:
         st = line.strip()
         if not st or st.startswith("#"):
             continue
@@ -878,7 +860,7 @@ def check_file(path, known, csv_keys, min_version, all_sections, mod_root,
     # W16 用了不存在的逻辑函数
     # 扫两处：${} / %{} 表达式，以及 setUnitMemory / updateUnitMemory 的值
     exprs = []       # [(行号, 表达式文本)]
-    for idx, line in enumerate(lines, 1):
+    for idx, line in logical_lines:
         st = line.strip()
         if not st or st.startswith("#"):
             continue
@@ -907,7 +889,7 @@ def check_file(path, known, csv_keys, min_version, all_sections, mod_root,
                                         f"函数 `{fn}(` 疑似拼错，是否想写 `{near[0]}`？"))
 
     # E15 @memory / @global / @define 行尾写了注释（会被当成值的一部分）
-    for idx, line in enumerate(lines, 1):
+    for idx, line in logical_lines:
         st = line.strip()
         if not re.match(r"^@(memory|global|define)\b", st):
             continue
@@ -918,7 +900,7 @@ def check_file(path, known, csv_keys, min_version, all_sections, mod_root,
                                 "引擎不剥离行尾 `#`，会把它当成值的一部分（注释请独占一行）"))
 
     # E13 @memory 的类型不合法
-    for idx, line in enumerate(lines, 1):
+    for idx, line in logical_lines:
         m = re.match(r"^\s*@memory\s+([A-Za-z_][\w]*)\s*:\s*(\S+)", line)
         if not m:
             continue
@@ -1051,6 +1033,226 @@ def collect_files(target):
     return sorted(out)
 
 
+# 与 MCP 数据层共用常见安装位置；不递归搜盘，也不依赖任何个人目录。
+GAME_CANDIDATES = [
+    r"D:/steam/steamapps/common/Rusted Warfare",
+    r"C:/Program Files (x86)/Steam/steamapps/common/Rusted Warfare",
+    r"C:/Program Files/Steam/steamapps/common/Rusted Warfare",
+    os.path.expanduser("~/Steam/steamapps/common/Rusted Warfare"),
+    os.path.expanduser("~/Library/Application Support/Steam/steamapps/common/Rusted Warfare"),
+    os.path.expanduser("~/.steam/steam/steamapps/common/Rusted Warfare"),
+]
+
+
+def find_core_units(core_units=None, game_jar=None, target=None):
+    """定位 assets/units；显式设置出错时不悄悄回退到另一份游戏。"""
+    for value, source in ((core_units, "argument"), (os.environ.get("RW_CORE_UNITS"), "RW_CORE_UNITS")):
+        if value:
+            path = os.path.realpath(os.path.expanduser(os.path.expandvars(os.fspath(value))))
+            return {"path": path if os.path.isdir(path) else None, "source": source,
+                    "error": None if os.path.isdir(path) else "指定的原版单位目录不存在: " + path}
+    games = []
+    for jar, source in ((game_jar, "jar"), (os.environ.get("RW_GAME_JAR"), "RW_GAME_JAR")):
+        if jar:
+            games.append((os.path.dirname(os.path.abspath(jar)), source))
+    if target:
+        directory = os.path.abspath(target)
+        if not os.path.isdir(directory):
+            directory = os.path.dirname(directory)
+        for _ in range(12):
+            if os.path.isfile(os.path.join(directory, "game-lib.jar")):
+                games.append((directory, "target_ancestor"))
+                break
+            parent = os.path.dirname(directory)
+            if parent == directory:
+                break
+            directory = parent
+    games.extend((path, "auto") for path in GAME_CANDIDATES)
+    for game, source in games:
+        path = os.path.realpath(os.path.join(game, "assets", "units"))
+        if os.path.isdir(path):
+            return {"path": path, "source": source, "error": None}
+    return {"path": None, "source": "unavailable",
+            "error": "未找到原版单位目录；可设置 RW_CORE_UNITS 或 --core-units 指向游戏 assets/units"}
+
+
+def _inside_directory(root, path):
+    try:
+        root, path = os.path.realpath(root), os.path.realpath(path)
+        return os.path.normcase(os.path.commonpath((root, path))) == os.path.normcase(root)
+    except ValueError:
+        return False
+
+
+def _core_target(root, suffix, relative_to=None):
+    """CORE: 只允许原版目录内的相对路径，包括解析符号链接后的实际位置。"""
+    relative = suffix.replace("\\", os.sep).replace("/", os.sep)
+    if not relative or ".." in relative or os.path.isabs(relative) or re.match(r"^[A-Za-z]:", relative):
+        raise ValueError("CORE: 必须使用不含 .. 的相对路径")
+    base = os.path.realpath(root)
+    candidate = os.path.realpath(os.path.join(relative_to or base, relative))
+    if not _inside_directory(base, candidate):
+        raise ValueError("CORE: 目标越出原版单位目录")
+    return candidate
+
+
+def _units_template(path, mod_root):
+    """仅单位自动继承最近的 all-units.template，不跨越模组根目录。"""
+    if not path.lower().endswith(".ini"):
+        return None
+    directory = os.path.dirname(os.path.abspath(path))
+    boundary = os.path.abspath(mod_root) if mod_root else directory
+    while True:
+        candidate = os.path.join(directory, "all-units.template")
+        if os.path.isfile(candidate):
+            return candidate
+        if directory == boundary:
+            return None
+        parent = os.path.dirname(directory)
+        if parent == directory:
+            return None
+        directory = parent
+
+
+class _ReferenceScopes:
+    """按单位收集本文件与本地继承链的符号，不能把同目录的其它单位混进来。
+
+    支持相对 copyFrom、ROOT:、CORE: 和最近的 all-units.template。只收集定义，
+    不计算继承后的键值合并。依赖可以在扫描
+    范围之外，只参与引用解析，不额外计入扫描文件数。每次 run_lint 重建作用域，
+    再交给 ProbeSet 校验，因此外部模板变更也能让依赖它的缓存失效。
+    """
+
+    def __init__(self, parsed, use_cache=True, core_location=None):
+        self.core_location = core_location or {"path": None, "source": "unavailable", "error": "未配置原版目录"}
+        self.core_references = set()
+        self.core_resolved = set()
+        self.core_errors = {}
+        self.parsed = {os.path.abspath(p): value for p, value in parsed.items()}
+        self.use_cache = use_cache
+        self.facts = {}
+        self.skipped = {}
+
+    def _load(self, path):
+        if path not in self.parsed:
+            try:
+                self.parsed[path] = parse_file(path, use_cache=self.use_cache)
+            except OSError as e:
+                self.skipped[path] = str(e)
+                self.parsed[path] = None
+        return self.parsed[path]
+
+    def _facts(self, path, full):
+        if path not in self.facts:
+            sections, _, lines, _, _, defines = full
+            referenced, excluded = set(), set()
+            section = None
+            for _, line in iter_config_lines(lines):
+                st = line.strip()
+                if st.startswith("[") and st.endswith("]"):
+                    section = st[1:-1].strip()
+                if re.match(r"^@copyFrom_skipThisSection\s*:\s*true\s*$", st, re.I):
+                    excluded.add(section)
+                for expr in re.findall(r"\$\{([^}]*)\}", line):
+                    referenced.update(x.lower() for x in
+                                      re.findall(r"[A-Za-z_][A-Za-z0-9_]*", expr))
+            self.facts[path] = ({name for _, name in sections}, defines, referenced, excluded)
+        return self.facts[path]
+
+    def for_file(self, path, mod_root):
+        origin = os.path.abspath(path)
+        template = _units_template(origin, mod_root)
+        stack = [(origin, 0)] + ([(template, 0)] if template else [])
+        visited, dependencies = set(), set()
+        uses_core = False
+        sections, defines, referenced = set(), set(), set()
+        while stack:
+            current, depth = stack.pop()
+            current = os.path.abspath(current)
+            dependencies.add(current)
+            if current in visited:
+                continue
+            if depth > 10:
+                self.skipped[current] = "copyFrom 超过 10 层，未继续展开"
+                continue
+            visited.add(current)
+            full = self._load(current)
+            if full is None:
+                continue
+            names, defs, refs, excluded = self._facts(current, full)
+            sections.update(names if current == origin else names - excluded)
+            defines.update(defs)
+            referenced.update(refs)
+            # 重复的 copyFrom 键由后者覆盖；逗号分割，文件名里的空格不能拆开。
+            copies = [(line, v) for line, k, v, sec in full[1] if sec == "core" and k == "copyFrom"]
+            copy_line, copy_value = copies[-1] if copies else (0, "")
+            for target in copy_value.split(","):
+                target = target.strip()
+                if not target:
+                    continue
+                if "${" in target or target.startswith("SHARED:"):
+                    self.skipped[current + " -> " + target] = "非本地或动态 copyFrom，未展开"
+                    continue
+                if target.startswith("CORE:"):
+                    uses_core = True
+                    reference = (current, target)
+                    self.core_references.add(reference)
+                    root = self.core_location["path"]
+                    if not root:
+                        self.skipped[current + " -> " + target] = self.core_location["error"]
+                        continue
+                    try:
+                        candidate = _core_target(root, target[len("CORE:"):])
+                    except ValueError as e:
+                        self.skipped[current + " -> " + target] = str(e)
+                        self.core_errors[reference] = Issue("error", "17", current, copy_line,
+                                                           "`%s` 路径非法：%s" % (target, e))
+                        continue
+                    dependencies.add(candidate)
+                    if self._load(candidate) is None:
+                        self.core_errors[reference] = Issue("error", "17", current, copy_line,
+                            "`%s` 目标不存在或不可读取：%s" % (target, candidate))
+                        continue
+                    self.core_resolved.add(reference)
+                    stack.append((candidate, depth + 1))
+                    continue
+                base = os.path.dirname(current)
+                core_root = self.core_location["path"]
+                if core_root and _inside_directory(core_root, current) and not target.startswith("ROOT:"):
+                    try:
+                        candidate = _core_target(core_root, target, relative_to=base)
+                    except ValueError as e:
+                        self.skipped[current + " -> " + target] = str(e)
+                        self.core_errors[(current, target)] = Issue("error", "17", current, copy_line,
+                            "原版配置的 copyFrom 路径非法：%s" % e)
+                        continue
+                    stack.append((candidate, depth + 1))
+                    continue
+                if target.startswith("ROOT:"):
+                    if not mod_root:
+                        self.skipped[current + " -> " + target] = "找不到模组根目录，未展开 ROOT:"
+                        continue
+                    target = target[len("ROOT:"):]
+                    base = mod_root
+                target = target.replace("\\", os.sep).replace("/", os.sep)
+                stack.append((os.path.join(base, target), depth + 1))
+        # CORE: 单位还记录实际继承文件指纹，值变化或切换原版目录也会重算；不影响无关单位。
+        signature = ""
+        if uses_core and rw_cache:
+            stamps = ["core=" + (self.core_location["path"] or "unavailable")]
+            stamps.extend("%s:%s" % (path, _stamp(path)) for path in dependencies)
+            signature = rw_cache.digest(stamps)
+        return {"all_sections": sections, "global_defines": defines,
+                "referenced": referenced}, bool(template), signature
+
+    def core_summary(self):
+        return {"mode": "symbols_only", "root": self.core_location["path"],
+                "source": self.core_location["source"],
+                "references": len(self.core_references), "resolved": len(self.core_resolved),
+                "unresolved": len(self.core_references - self.core_resolved),
+                "not_checked": ["继承后的键值合并、覆盖与完整加载规则", "运行时表达式与游戏行为"]}
+
+
 def _asset_key(name):
     """归一化文件名：忽略空格 / 连字符 / 下划线 / 全半角括号，只留主干和扩展名。"""
     stem, ext = os.path.splitext(name)
@@ -1104,10 +1306,21 @@ def load_csv_rows(path):
     out = {}
     if not path or not os.path.isfile(path):
         return out
+    section = ""
     with io.open(path, encoding="utf-8-sig", newline="") as fh:
         for n, row in enumerate(csv.reader(fh), 1):
             if len(row) < 4:
                 continue
+            # 两种节头：入门表的首列 [core]，以及正文 Section/Type 行的第四列。
+            # 不把例子正文中出现的 [action_x] 误当作节头。
+            heading = (row[0] or "").strip()
+            if not re.fullmatch(r"\[[^]]+\]", heading):
+                heading = row[3].strip() if row[1].strip().lower() in ("section", "type") else ""
+            match = re.match(r"^\[([^]]+)\]", heading)
+            if match:
+                section = match.group(1)
+            if row[1].strip() in ("Projectile Draw Types", "Original Units", "File"):
+                section = ""
             code = (row[1] or "").strip()
             desc = (row[3] or "").strip()
             vtype = (row[2] or "").strip()
@@ -1128,15 +1341,15 @@ def load_csv_rows(path):
             ver = (row[0] or "").strip()
             if ver.startswith("["):
                 ver = ""          # 有些行把 [section] 塞在版本列里
-            item = dict(row=n,
+            item = dict(row=n, section=section,
                         version=ver,
                         value_type=vtype,
                         description=desc,
                         example=(row[4] or "").strip() if len(row) > 4 else "",
                         spelling=base)
             bucket = out.setdefault(base.lower(), [])
-            sig = (item["version"], item["value_type"], item["description"], item["example"])
-            if not any((x["version"], x["value_type"], x["description"], x["example"]) == sig
+            sig = (item["section"], item["version"], item["value_type"], item["description"], item["example"])
+            if not any((x["section"], x["version"], x["value_type"], x["description"], x["example"]) == sig
                        for x in bucket):
                 bucket.append(item)
     return out
@@ -1330,7 +1543,7 @@ def _load_tables(csv_path, cn_path, jar_path):
     return val
 
 
-def run_lint(target, csv_path=None, cn_path=None, jar_path=None, incremental=True):
+def run_lint(target, csv_path=None, cn_path=None, jar_path=None, incremental=True, core_units=None):
     """程序化入口：不打印、不退出，返回结果字典。
 
     issues 里是 Issue 对象（保留 __str__ 的原始格式），需要 JSON 时用 .as_dict()。
@@ -1367,30 +1580,26 @@ def run_lint(target, csv_path=None, cn_path=None, jar_path=None, incremental=Tru
         res["files"] = len(files)
         res["scanned_files"] = len(files)
 
-        all_sections, all_defines, unit_names, referenced, parsed = set(), set(), set(), set(), {}
+        unit_names, parsed = set(), {}
         for f in files:
             try:
-                full = parse_file(f)
+                full = parse_file(f, use_cache=incremental)
             except Exception as e:
                 res["skipped"].append(dict(file=f, error=str(e)))
                 continue
-            secs, entries, lines = full[0], full[1], full[2]
+            entries = full[1]
             parsed[f] = full
-            all_sections |= {s for _, s in secs}
-            all_defines |= full[5]
             for _ln, _k, _v, _sec in entries:
                 if (_sec or "").lower().startswith("core") and _k in ("name", "altNames"):
                     for _nm in re.split(r"[,\s]+", _v.strip()):
                         if _nm and not _nm.startswith("${"):
                             unit_names.add(_nm.lower())
-            for line in lines:
-                for expr in re.findall(r"\$\{([^}]*)\}", line):
-                    for ident in re.findall(r"[A-Za-z_][A-Za-z0-9_]*", expr):
-                        referenced.add(ident.lower())
 
+        # 只有单位名称表是扫描范围共享的；节和常量属于各自的继承作用域。
+        ref_scopes = _ReferenceScopes(parsed, use_cache=incremental,
+                                      core_location=find_core_units(core_units, jar_path, target))
+        unit_names_digest = rw_cache.digest(unit_names) if rw_cache else ""
         # ---- 缓存准备 -------------------------------------------------
-        cross_sets = dict(all_sections=all_sections, global_defines=all_defines,
-                          referenced=referenced, unit_names=unit_names)
         issue_cache = None
         scope = ""
         digests = {}
@@ -1403,15 +1612,18 @@ def run_lint(target, csv_path=None, cn_path=None, jar_path=None, incremental=Tru
                 # scope 把「扫单文件」和「扫整个目录」区分开：
                 # 两者看到的跨文件集合不同，结论不能互相复用。
                 scope = rw_cache.digest(sorted(os.path.abspath(f) for f in files))
-                digests = {k: rw_cache.digest(sorted(v)) for k, v in cross_sets.items()}
 
         all_issues = []
         for f in parsed:
             mod_root_dir, mod_info = find_mod_root(f)
             mv = read_min_version(mod_info)
-            has_tpl = bool(mod_root_dir and os.path.isfile(
-                os.path.join(mod_root_dir, "all-units.template")))
-            ctx = "%s|%d" % (mv, 1 if has_tpl else 0)
+            cross_sets, has_tpl, core_signature = ref_scopes.for_file(f, mod_root_dir)
+            cross_sets["unit_names"] = unit_names
+            if issue_cache is not None and issue_cache.enabled:
+                digests = {k: rw_cache.digest(v) for k, v in cross_sets.items()
+                           if k != "unit_names"}
+                digests["unit_names"] = unit_names_digest
+            ctx = "%s|%d|%s" % (mv, 1 if has_tpl else 0, core_signature)
 
             if issue_cache is not None:
                 hit = issue_cache.lookup(f, scope, ctx, cross_sets, digests)
@@ -1430,19 +1642,24 @@ def run_lint(target, csv_path=None, cn_path=None, jar_path=None, incremental=Tru
                 except Exception:
                     # 检查中途抛异常时探针是残缺的，宁可不算缓存
                     all_issues += check_file(
-                        f, known, csv_keys, mv, all_sections, root, all_defines,
-                        referenced, canon, unit_names, key_families, has_tpl,
-                        key_templates, parsed=parsed[f])
+                        f, known, csv_keys, mv, cross_sets["all_sections"], root,
+                        cross_sets["global_defines"], cross_sets["referenced"], canon,
+                        unit_names, key_families, has_tpl, key_templates, parsed=parsed[f])
                 else:
                     issue_cache.store(f, scope, ctx, iss,
                                       {k: v.probes for k, v in probes.items()})
                     all_issues += iss
             else:
                 all_issues += check_file(
-                    f, known, csv_keys, mv, all_sections, root, all_defines,
-                    referenced, canon, unit_names, key_families, has_tpl,
-                    key_templates, parsed=parsed[f])
+                    f, known, csv_keys, mv, cross_sets["all_sections"], root,
+                    cross_sets["global_defines"], cross_sets["referenced"], canon,
+                    unit_names, key_families, has_tpl, key_templates, parsed=parsed[f])
 
+        if ref_scopes.core_references:
+            res["core"] = ref_scopes.core_summary()
+        all_issues.extend(ref_scopes.core_errors.values())
+        res["skipped"].extend({"file": p, "error": error}
+                              for p, error in sorted(ref_scopes.skipped.items()))
         all_issues.sort(key=lambda i: (i.path, i.line))
         res["issues"] = all_issues
         res["errors"] = sum(1 for i in all_issues if i.level == "error")
@@ -1479,6 +1696,7 @@ def main():
     ap.add_argument("--csv", default=None, help="官方代码表 CSV")
     ap.add_argument("--cn", default=None, help="中文离线代码表 txt")
     ap.add_argument("--jar", default=None, help="game-lib.jar（可选，增加二进制键名）")
+    ap.add_argument("--core-units", default=None, help="原版 assets/units 目录（覆盖 RW_CORE_UNITS 与自动定位）")
     ap.add_argument("--quiet", action="store_true", help="只显示错误")
     ap.add_argument("--json", action="store_true", help="输出 JSON")
     ap.add_argument("--ref", action="store_true",
@@ -1496,7 +1714,7 @@ def main():
         ap.error("需要指定要检查的文件或目录（或用 --ref 查看速查表）")
 
     res = run_lint(args.target, args.csv, args.cn, args.jar,
-                   incremental=not args.no_cache)
+                   incremental=not args.no_cache, core_units=args.core_units)
     if not res["ok"]:
         print("错误：" + str(res["error"]), file=sys.stderr)
         return 1
@@ -1508,11 +1726,12 @@ def main():
     warns = [i for i in all_issues if i.level == "warning"]
 
     if args.json:
-        print(json.dumps(dict(files=res["files"], errors=len(errors), warnings=len(warns),
-                              elapsed_ms=res.get("elapsed_ms", 0),
-                              cache=res.get("cache"),
-                              issues=[i.as_dict() for i in all_issues]),
-                         ensure_ascii=False, indent=2))
+        payload = dict(files=res["files"], errors=len(errors), warnings=len(warns),
+                       elapsed_ms=res.get("elapsed_ms", 0), cache=res.get("cache"),
+                       skipped=res["skipped"], issues=[i.as_dict() for i in all_issues])
+        if "core" in res:
+            payload["core"] = res["core"]
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
     else:
         ks = res["key_sources"]
         print(f"扫描 {res['files']} 个文件；键名资料 {ks.get('known', 0)} 条"
@@ -1528,8 +1747,13 @@ def main():
                 print(" ", i)
             print()
         if not errors and not warns:
-            print("干净，没发现问题。")
+            print("已检查部分未发现问题，但有依赖未展开，检查不完整。" if res["skipped"]
+                  else "干净，没发现问题。")
         print(f"\n合计：{len(errors)} 个错误，{len(warns)} 个警告")
+        if "core" in res:
+            core = res["core"]
+            print("CORE: 引用 %d，目标已读取 %d，未解析 %d；仅核对定义，不验证完整合并或运行时。"
+                  % (core["references"], core["resolved"], core["unresolved"]))
 
     if args.timing:
         c = res.get("cache") or {}

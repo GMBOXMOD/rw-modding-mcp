@@ -25,6 +25,7 @@ ROOT = os.path.dirname(HERE)
 sys.path.insert(0, os.path.join(ROOT, "tools"))
 
 import importlib.util
+from rw_test_support import find_test_mod
 
 spec = importlib.util.spec_from_file_location("rw_lint", os.path.join(ROOT, "tools", "rw_lint.py"))
 rw_lint = importlib.util.module_from_spec(spec)
@@ -156,18 +157,18 @@ def _sig(res):
 def check_cache_equivalence():
     """缓存结果必须与全量重算逐条一致 —— 这是缓存唯一真正重要的性质。"""
     ok = bad = 0
-    for t in (FIX, os.path.join(ROOT, "示例"), os.path.join(ROOT, "minesweeper"),
-              os.path.join(ROOT, "Kings of Cards")):
-        if not os.path.exists(t):
-            print("  SKIP  %-28s 目录不存在" % os.path.basename(t))
+    targets = [("fixtures", FIX)] + [(name, find_test_mod(name, ROOT))
+                                    for name in ("示例", "minesweeper", "Kings of Cards")]
+    for name, t in targets:
+        if not t:
+            print("  SKIP  %-28s 目录不存在（可设置 RW_TEST_MOD_ROOTS）" % name)
             continue
         full = rw_lint.run_lint(t, incremental=False)
         cold = rw_lint.run_lint(t, incremental=True)
         hot = rw_lint.run_lint(t, incremental=True)
-        name = os.path.basename(t)
-        if _sig(full) == _sig(cold) == _sig(hot):
-            print("  PASS  %-28s 全量=%dms 冷=%dms 热=%dms 结论一致"
-                  % (name, full["elapsed_ms"], cold["elapsed_ms"], hot["elapsed_ms"]))
+        if all(r["ok"] for r in (full, cold, hot)) and _sig(full) == _sig(cold) == _sig(hot):
+            print("  PASS  %-28s 全量=%dms 冷=%dms 热=%dms 结论一致（未展开/跳过 %d）"
+                  % (name, full["elapsed_ms"], cold["elapsed_ms"], hot["elapsed_ms"], len(full["skipped"])))
             ok += 1
         else:
             print("  FAIL  %-28s 缓存结论与全量不一致" % name)
@@ -254,12 +255,12 @@ def check_bootstrap_marker():
     ok = bad = 0
     try:
         spec2 = importlib.util.spec_from_file_location(
-            "rw_bootstrap", os.path.join(ROOT, "rw-modding-mcp", "bootstrap.py"))
+            "rw_bootstrap", os.path.join(ROOT, "bootstrap.py"))
         bs = importlib.util.module_from_spec(spec2)
         spec2.loader.exec_module(bs)
     except Exception as e:                                  # noqa: BLE001
-        print("  SKIP  %-28s 加载失败：%s" % ("bootstrap", e))
-        return 0, 0
+        print("  FAIL  %-28s 加载失败：%s" % ("bootstrap", e))
+        return 0, 1
 
     tmp = tempfile.mkdtemp(prefix="rwlint-boot-")
     try:
@@ -458,6 +459,18 @@ def main():
     e_ok, e_bad = check_explain()
     passed += e_ok
     failed += e_bad
+
+    print("\n-- 解析与作用域回归 --")
+    from test_regressions import run_suite
+    r_ok, r_bad = run_suite()
+    passed += r_ok
+    failed += r_bad
+
+    print("\n-- 定向查询与返回预算 --")
+    from test_tool_queries import run_suite as run_query_suite
+    q_ok, q_bad = run_query_suite()
+    passed += q_ok
+    failed += q_bad
 
     print("\n-- 缓存与增量 --")
     c_ok, c_bad = check_cache()
