@@ -81,6 +81,8 @@ EXPLAIN_CASES = [
      "updateUnitMemory 也算写，不应误报"),
     ("explain_action_entry.ini",        [],
      "action_* 是玩家入口，不该报 unreachable"),
+    ("explain_channel_trigger.ini",     [],
+     "onShoot / takeResources 通道引用的动作不该报 unreachable"),
 ]
 
 
@@ -374,6 +376,28 @@ def check_payload_size():
     return ok, bad
 
 
+
+def check_w11_builtin_names():
+    """`[canBuild] name:` 可以指向原版单位，不该报「找不到同名单位」。
+
+    这条依赖本机装了游戏（要读 assets/units 拿原版内部名），
+    没有就 SKIP —— 不能让 CI 因为没装游戏而红。
+    """
+    import rw_lint
+    names = rw_lint.builtin_unit_names()
+    if not names:
+        print("  SKIP  %-30s 没找到游戏目录，无法校验原版单位名" % "W11 原版名")
+        return 0, 0
+    path = os.path.join(FIX, "w11_builtin_name.ini")
+    res = rw_lint.run_lint(path, incremental=False)
+    codes = [i.code for i in (res.get("issues") or [])]
+    if "11" not in codes:
+        print("  PASS  %-30s heavyTank 是原版名，没被误报" % "W11 原版名")
+        return 1, 0
+    print("  FAIL  %-30s 原版名 heavyTank 被 W11 误报" % "W11 原版名")
+    return 0, 1
+
+
 def check_workflows():
     """校验 .github/workflows/*.yml 能被 YAML 解析。
 
@@ -487,6 +511,11 @@ def main():
     s_ok, s_bad = check_payload_size()
     passed += s_ok
     failed += s_bad
+
+    print("\n-- 原版单位名 --")
+    w_ok, w_bad = check_w11_builtin_names()
+    passed += w_ok
+    failed += w_bad
 
     print("\n-- 工作流 --")
     w_ok, w_bad = check_workflows()

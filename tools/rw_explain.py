@@ -39,6 +39,20 @@ TRIGGER_EVENT = "autoTriggerOnEvent"
 TRIGGER_PERIODIC = "autoTrigger"
 GATE_KEYS = ("alsoTriggerOrQueueActionConditional", "alsoTriggerActionConditional")
 EDGE_KEY = "alsoTriggerAction"
+
+# 除了 alsoTriggerAction，还有一批键的值同样是「要触发的动作名」。
+# 漏掉它们会让被这些通道引用的动作被误报成「不可达」——
+# 番外13（takeResources_triggerActionIfAny/IfNoneCollected）和
+# 番外23（onShoot_triggerActions）就是这么被误伤的。
+CHANNEL_KEYS = (
+    "onShoot_triggerActions",
+    "takeResources_triggerActionIfAnyCollected",
+    "takeResources_triggerActionIfNoneCollected",
+    "takeResources_triggerActionForEach",
+    "addWaypoint_triggerActionIfMatched",
+    "addWaypoint_triggerActionIfFailed",
+    "whenBuilding_triggerAction",
+)
 REPEAT_KEY = "alsoTriggerActionRepeat"
 COND_KEY = "requireConditional"
 
@@ -248,7 +262,14 @@ def analyze_file(path):
         for _ln, v in kv.get(EDGE_KEY, []):
             for tgt in _split_targets(v):
                 node["edges"].append({"to": tgt, "resolved": resolve(tgt),
-                                      "repeat": node["repeat"]})
+                                      "repeat": node["repeat"], "via": EDGE_KEY})
+
+        # 通道键：同样指向动作，只是触发时机不同（开火 / 搜到目标 / 建造完成…）
+        for ck in CHANNEL_KEYS:
+            for _ln, v in kv.get(ck, []):
+                for tgt in _split_targets(v):
+                    node["edges"].append({"to": tgt, "resolved": resolve(tgt),
+                                          "repeat": None, "via": ck})
 
         writes = set()
         # updateUnitMemory 官方定义是「类似 setUnitMemory 但性能更好」，

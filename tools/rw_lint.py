@@ -765,7 +765,8 @@ def check_file(path, known, csv_keys, min_version, all_sections, mod_root,
                 nm = nm.strip()
                 if (nm and not nm.startswith("${")
                         and nm.lower() not in unit_names
-                        and nm.lower() not in BUILTIN_BUILD_ENTRIES):
+                        and nm.lower() not in BUILTIN_BUILD_ENTRIES
+                        and nm.lower() not in builtin_unit_names()):
                     issues.append(Issue("warning", "11", path, ln,
                                         f"`[canBuild] name: {nm}` 在本模组里找不到同名单位（`[core] name:` 或 altNames）"))
 
@@ -1074,6 +1075,41 @@ def find_core_units(core_units=None, game_jar=None, target=None):
             return {"path": path, "source": source, "error": None}
     return {"path": None, "source": "unavailable",
             "error": "未找到原版单位目录；可设置 RW_CORE_UNITS 或 --core-units 指向游戏 assets/units"}
+
+
+_BUILTIN_NAMES_CACHE = None
+
+
+def builtin_unit_names(core_units=None, game_jar=None):
+    """原版单位的内部名，从 assets/units 下的 ini 里收集 name: 的值。
+
+    为什么需要它：`[canBuild] name:` 可以合法地指向**原版单位**
+    （比如工厂直接产 tank）。只拿模组自己的单位名去比对，会把
+    `heavyTank` 这种正确写法报成「找不到同名单位」。
+    进程内缓存一次；找不到游戏目录就返回空集，W11 退化成只认模组单位。
+    """
+    global _BUILTIN_NAMES_CACHE
+    if _BUILTIN_NAMES_CACHE is not None:
+        return _BUILTIN_NAMES_CACHE
+    names = set()
+    root = find_core_units(core_units, game_jar).get("path")
+    if root:
+        for dp, _dn, fns in os.walk(root):
+            for f in fns:
+                if not f.lower().endswith(".ini"):
+                    continue
+                try:
+                    text = io.open(os.path.join(dp, f), encoding="utf-8",
+                                   errors="replace").read()
+                except OSError:
+                    continue
+                for m in re.finditer(r"^name\s*:\s*(.+)$", text, re.M):
+                    for nm in re.split(r"[,;]", m.group(1)):
+                        nm = nm.strip()
+                        if nm and not nm.startswith("${"):
+                            names.add(nm.lower())
+    _BUILTIN_NAMES_CACHE = names
+    return names
 
 
 def _inside_directory(root, path):
