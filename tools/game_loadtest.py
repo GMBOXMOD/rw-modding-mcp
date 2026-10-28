@@ -54,6 +54,7 @@ ERR_PATTERNS = [
     (re.compile(r"^Adding error for mod:.*?: (.+)$", re.M), "模组错误"),
     (re.compile(r"^alert:Error loading mod '([^']*)': (.+)$", re.M), "模组加载失败"),
     (re.compile(r"^(\S*(?:Exception|Error): .+)$", re.M), "引擎异常"),
+    (re.compile(r"^(com\.corrodinggames\.\S+: .+)$", re.M), "引擎异常（混淆类名）"),
     (re.compile(r"^java\.lang\.\w+(?:Exception|Error): (.+)$", re.M), "Java 异常"),
 ]
 
