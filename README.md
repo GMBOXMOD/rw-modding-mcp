@@ -1,5 +1,7 @@
 # 铁锈战争模组 MCP
 
+[![M8ven Score](https://m8ven.ai/badge/mcp/gmboxmod-rw-modding-mcp-193cu7?v=6d952b5c688774a21da25c611d40cb66)](https://m8ven.ai/mcp/gmboxmod-rw-modding-mcp-193cu7?s=readme)
+
 《铁锈战争》模组开发的 MCP 服务端，五个只读工具。
 
 仓库 `https://github.com/GMBOXMOD/rw-modding-mcp`，变更见 [CHANGELOG.md](CHANGELOG.md)。
