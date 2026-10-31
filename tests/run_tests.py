@@ -46,6 +46,8 @@ CASES = [
     ("bad_alwayssinglepress.ini",   ["15"],           "alwaysSinglePress 缺配套键"),
     ("bad_repeat.ini",              ["13", "14"],     "repeat 没配 alsoTriggerAction / 写 0"),
     ("bad_func.ini",                ["16"],           "用了不存在的函数 abs()"),
+    ("bad_w10_runtime_text.ini",    ["10", "10"],     "按钮文本把运行期值写成 ${}（text + text_zh 各一条）"),
+    ("good_w10_const_desc.ini",     [],               "@global 常量写进 description 是合法用法，不该报 W10"),
     ("good_minimal.ini",            [],               "最小合法单位（应零错误）"),
 ]
 

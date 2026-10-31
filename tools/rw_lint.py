@@ -317,8 +317,12 @@ def strip_runtime_blocks(text):
             i += 2
             continue
         if text[i] == "}":
-            if stack:
-                stack.pop()
+            top = stack.pop() if stack else None
+            # 关掉的是 ${...}（且不在 %{...} 里面）→ 这个 } 属于载入期部分，必须保留。
+            # 原来一律丢掉，导致 "Kills ${memory.kills}" 返回 "Kills ${memory.kills"，
+            # 想再扫一遍 ${...} 就永远匹配不到。
+            if top == "v" and "t" not in stack:
+                out.append("}")
             i += 1
             continue
         if "t" not in stack:
@@ -749,9 +753,20 @@ def check_file(path, known, csv_keys, min_version, all_sections, mod_root,
         if not sec:
             continue
         v = val.strip()
-        if sec.startswith("action") and key in ACTION_TEXT_KEYS and "${" in strip_runtime_blocks(v):
-            issues.append(Issue("warning", "10", path, ln,
-                                f"按钮文本 `{key}` 用了载入期 `${{}}`，应改用运行期 `%{{}}`，否则永远显示初始值"))
+        if sec.startswith("action") and key in ACTION_TEXT_KEYS:
+            # 只报「值会随运行期变化」的 ${}。
+            # 纯 @global / @define 的裸名（如 ${ANCHOR_DURATION}）载入期展开成常量，
+            # 放在 description 里正是想要的结果，不算错——18b 那 4 条就是这么误报的。
+            bad = None
+            for m in re.finditer(r"\$\{([^}]*)\}", strip_runtime_blocks(v)):
+                expr = m.group(1).strip()
+                if "." not in expr and "(" not in expr and expr.lower() in declared:
+                    continue
+                bad = expr
+                break
+            if bad is not None:
+                issues.append(Issue("warning", "10", path, ln,
+                                    f"按钮文本 `{key}` 里的 `${{{bad}}}` 是载入期展开，运行时会永远显示初始值；应改用 `%{{}}`"))
         if key in ("setUnitMemory", "updateUnitMemory") and "%{" in v:
             issues.append(Issue("warning", "10", path, ln,
                                 f"`{key}` 里出现运行期 `%{{}}`，这里只认载入期 `${{}}` 和字面量"))
