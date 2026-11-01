@@ -1,52 +1,52 @@
-[English](README.en.md) | 简体中文
+English | [简体中文](README.zh-CN.md)
 
-# 铁锈战争模组 MCP
+# Rusted Warfare Modding MCP
 
 [![M8ven Score](https://m8ven.ai/badge/mcp/gmboxmod-rw-modding-mcp-193cu7?v=6d952b5c688774a21da25c611d40cb66)](https://m8ven.ai/mcp/gmboxmod-rw-modding-mcp-193cu7?s=readme)
 
-《铁锈战争》模组开发的 MCP 服务端，五个只读工具。
+An MCP server for Rusted Warfare mod development. Five read-only tools.
 
-仓库 `https://github.com/GMBOXMOD/rw-modding-mcp`，变更见 [CHANGELOG.md](CHANGELOG.md)。
+Repository: `https://github.com/GMBOXMOD/rw-modding-mcp` · Changes: [CHANGELOG.md](CHANGELOG.md)
 
-## 工具
+## Tools
 
-| 工具 | 作用 |
+| Tool | What it does |
 |---|---|
-| `lookup_key` | 按节查键，默认短释义与例子，保留来源、资料冲突和约束；完整资料按需取 |
-| `search_source` | 批量搜 Java 源码，带有限上下文、分页、空结果诊断和内容预算 |
-| `get_ref` | 按主题和名称查事件、函数、枚举、内存类型与规则；无参数保留完整速查表 |
-| `lint` | 静态检查文件或目录；支持批量 `paths`，未改动的文件复用上次结论 |
-| `explain_actions` | 画 事件/autoTrigger/按钮 → 动作 → alsoTriggerAction 的调用图，标 repeat、条件、memory 读写 |
+| `lookup_key` | Look up a key by section. Returns a short definition plus examples by default, preserving sources, cross-source conflicts, and constraints. Full material on request. |
+| `search_source` | Batch-search the Java source with bounded context, pagination, empty-result diagnostics, and a content budget. |
+| `get_ref` | Look up events, functions, enums, memory types, and rules by topic and name. No arguments returns the full quick-reference tables. |
+| `lint` | Static check on a file or directory. Accepts batch `paths`; unchanged files reuse the previous verdict. |
+| `explain_actions` | Draws the call graph from events / autoTrigger / buttons → actions → `alsoTriggerAction`, flagging repeat, conditions, and memory reads/writes. |
 
-全部只读，不改你的文件。
+All tools are read-only. None of them modify your files.
 
-查多个键用 `lookup_key(keys=[...])`，检查多个文件用 `lint(paths=[...])`。
-批量查询能减少模型往返，精简输出能减少进入上下文的资料量；实际费用取决于客户端、模型和缓存。
-本地 lint 缓存只节省检查时间，不是模型的提示词缓存。MCP 也不能限制客户端的 Bash、子 agent 或模型请求预算。
+Query many keys with `lookup_key(keys=[...])`, check many files with `lint(paths=[...])`.
+Batch queries cut model round-trips and trimmed output cuts what enters the context; actual cost depends on the client, the model, and caching.
+The local lint cache only saves checking time — it is not the model's prompt cache. The MCP also cannot cap the client's Bash, sub-agent, or model request budget.
 
-## 配套技能（Skill）
+## Companion Skill
 
-`skill/` 下是配套的开发指南技能，给支持 Skill 的客户端（Claude Code、CodeBuddy 等）用：
+`skill/` holds the companion development-guide skill, for clients that support Skills (Claude Code, CodeBuddy, and others):
 
-| 文件 | 内容 |
+| File | Contents |
 |---|---|
-| `skill/SKILL.md` | 分工说明、工作流程、硬事实清单、lint 规则号速查 |
-| `skill/references/铁锈战争模组开发Agent指南.md` | 完整开发指南（9 章 + 附录） |
-| `skill/references/反编译发现_运行时语义.md` | 反编译得到的实现层事实 |
-| `skill/references/反编译_字段对照表.md` | 混淆字段 → luke 键 |
-| `skill/references/锁步联机与动态帧率补偿.md` | 联机 / 锁步 / 帧率专项 |
+| `skill/SKILL.md` | Division of labour, workflow, hard-fact checklist, lint rule-number reference |
+| `skill/references/铁锈战争模组开发Agent指南.md` | Full development guide (9 chapters + appendices) |
+| `skill/references/反编译发现_运行时语义.md` | Implementation-level facts obtained by decompilation |
+| `skill/references/反编译_字段对照表.md` | Obfuscated field → luke key mapping |
+| `skill/references/锁步联机与动态帧率补偿.md` | Multiplayer / lockstep / frame-rate specifics |
 
-分工很明确：**本 MCP 管事实**（键叫什么、有没有、代码合不合法），
-**技能管判断**（该不该这么写、为什么会静默失效、哪些是过时的 hack）。
+The split is deliberate: **this MCP owns facts** (what a key is called, whether it exists, whether the code is valid),
+**the skill owns judgement** (whether you should write it that way, why something fails silently, which tricks are outdated).
 
-技能里**不带脚本、也不带数据表**——它们和本仓库重复，两份真相会漂移。
-要跑静态检查用 `lint` 工具，要跑加载测试用 `tools/game_loadtest.py`。
+The skill ships **no scripts and no data tables** — both would duplicate this repository, and two copies of the truth drift apart.
+For static checks use the `lint` tool; for a load test use `tools/game_loadtest.py`.
 
-安装：把 `skill/` 整个目录复制到客户端的 skills 目录，改名为 `rusted-warfare-modding`。
+Install: copy the whole `skill/` directory into your client's skills directory and rename it to `rusted-warfare-modding`.
 
-## 定向查询与返回预算
+## Targeted Queries and Return Budget
 
-下面是 MCP 工具参数示例，不需要在终端执行：
+The snippets below are MCP tool arguments, not shell commands:
 
 ```python
 lookup_key(keys=["isVisible", "isActive", "displayType"], section="action")
@@ -58,41 +58,41 @@ search_source(patterns=["setUnitStats", "setUnitMemory"], path_filter="custom/")
 search_source(pattern="EventSourceReference|teamId", mode="regex")
 ```
 
-- `lookup_key` 默认 `detail="brief"`：每个节最多一条短释义/例子，最多展示三个节。
-  长说明标 `truncated`，过长的例子用 `example_omitted` 标明省略，不返回半段配置；未展示的节标 `entries_omitted`。
-  约束、资料冲突和重要说明保留。
-  `section` 接受 `action`、`[action_btn]` 或 `M` 等节名/章节字母。
-  `section_match=false` 表示资料没有确认指定节的用法，不等于该键在引擎里绝对不可用。
-  一次最多 32 个不同的键，重复输入只查一次；`count` 是去重后的数量，`requested_count` 是输入数量。
-- **返回形状变化**：默认模式不再返回原始 `csv` / `cn` 数组，改用 `entries`；依赖原始字段的程序
-  请显式传 `detail="full"`。旧的位置参数保留，完整模式保留原有原始资料字段。
-- `search_source` 默认 `10` 条匹配、前后各 `2` 行（`context_lines` 可设 `0–5`）。
-  `patterns` 一次最多 8 个不同的查询，同一行匹配多个词只返回一次，计数见 `by_pattern`。
-  `mode="literal"` 按原文匹配，找 `%{` 就直接传 `%{`，不要写 `%\{`。
-  正则使用 `mode="regex"`；旧的 `regex=True` 仍可用，但不能与 `mode="literal"` 冲突。
-  `path_filter` 是路径子串而非 glob。空结果看 `reason` / `hints`，不会擅自改模式或扩大范围。
-- 搜索的 `max_chars` 默认 `8000`，范围 `1000–20000`，限制 `matches` 的紧凑 JSON 字符数，
-  **不包含结果元数据，也不是 token 数**。数量或字符预算达到上限时，用 `next_offset` 作为下次的 `offset`。
-  超长匹配行/上下文会标明截短；分页只在进程内源码索引不变时稳定，重新反编译后需重启服务。
-- `get_ref()` 无参数仍返回完整速查表。常用主题：`events`、`functions`、`enums`、`memory`、
-  `sections`、`rules`、`must_pair`、`hard_constraints`。`name` 按名称筛选，需同时指定 `topic`。
-  这轮只查询已有资料；没有新增教程模板，也不把“名称收录”当作运行时语义已验证。
+- `lookup_key` defaults to `detail="brief"`: at most one short definition/example per section, at most three sections shown.
+  Long descriptions are marked `truncated`; over-long examples are marked `example_omitted` rather than returned as half a config; sections not shown are marked `entries_omitted`.
+  Constraints, source conflicts, and important notes are always kept.
+  `section` accepts `action`, `[action_btn]`, or a chapter letter such as `M`.
+  `section_match=false` means the material does not confirm usage in that section — it does not mean the key is unusable in the engine.
+  Up to 32 distinct keys per call; repeated inputs are looked up once. `count` is the deduplicated number, `requested_count` is what you sent.
+- **Return shape change**: the default mode no longer returns the raw `csv` / `cn` arrays but uses `entries`. Programs that depend on the
+  raw fields should pass `detail="full"` explicitly. The old positional arguments are kept, and full mode keeps the original raw fields.
+- `search_source` defaults to `10` matches with `2` lines of context on each side (`context_lines` accepts `0–5`).
+  `patterns` takes up to 8 distinct queries per call; a line matching several terms is returned once, with counts in `by_pattern`.
+  `mode="literal"` matches raw text — to find `%{` pass `%{` directly, not `%\{`.
+  Use `mode="regex"` for regular expressions; the older `regex=True` still works but must not conflict with `mode="literal"`.
+  `path_filter` is a path substring, not a glob. On empty results read `reason` / `hints` — it will not silently switch modes or widen the scope.
+- Search `max_chars` defaults to `8000`, range `1000–20000`. It limits the compact-JSON character count of `matches`,
+  **excludes result metadata, and is not a token count**. When the count or character budget is hit, pass `next_offset` as the next `offset`.
+  Over-long matching lines or context are marked as truncated; pagination is stable only while the in-process source index is unchanged — after re-decompiling, restart the server.
+- `get_ref()` with no arguments still returns the full quick-reference tables. Common topics: `events`, `functions`, `enums`, `memory`,
+  `sections`, `rules`, `must_pair`, `hard_constraints`. `name` filters by name and requires `topic` alongside it.
+  This round only queries existing material; no new tutorial templates were added, and "the name is listed" is not treated as verified runtime semantics.
 
-普通单位建议先定向查询，再写文件并检查；是否启动多 agent 或继续源码研究，应由客户端单独征得用户同意并设置预算。
+For an ordinary unit, query narrowly first, then write the file and check it. Whether to spin up sub-agents or keep digging through source is a decision the client should put to the user separately, with a budget.
 
-## 安装
+## Install
 
-需要 Python 3.10+。
+Python 3.10+ required.
 
 ```bash
 git clone https://github.com/GMBOXMOD/rw-modding-mcp.git
 cd rw-modding-mcp
-python bootstrap.py --check     # 看环境缺什么
+python bootstrap.py --check     # see what the environment is missing
 ```
 
-首次启动会自动建 venv、装 `mcp`，约 20–60 秒。
+The first start creates a venv and installs `mcp` automatically — roughly 20–60 seconds.
 
-## 客户端配置
+## Client Configuration
 
 ```json
 {
@@ -105,11 +105,11 @@ python bootstrap.py --check     # 看环境缺什么
 }
 ```
 
-Claude Desktop 写进 `claude_desktop_config.json`，Cursor 写进 `~/.cursor/mcp.json`，Cline 写进 `cline_mcp_settings.json`。VS Code 的 `.vscode/mcp.json` 外层键是 `servers`，里面一样。
+For Claude Desktop write this into `claude_desktop_config.json`; for Cursor, `~/.cursor/mcp.json`; for Cline, `cline_mcp_settings.json`. VS Code's `.vscode/mcp.json` uses `servers` as the outer key — the contents are the same.
 
-不用设 `cwd`。`command` 写 `python` 或绝对路径都行。
+No `cwd` needed. `command` can be `python` or an absolute path.
 
-启动约 2.4 秒，客户端要在会话期间保持进程存活。想再快一点可以跳过启动器：
+Startup takes about 2.4 seconds; the client must keep the process alive for the duration of the session. To shave more time, skip the launcher:
 
 ```json
 {
@@ -122,80 +122,80 @@ Claude Desktop 写进 `claude_desktop_config.json`，Cursor 写进 `~/.cursor/mc
 }
 ```
 
-先跑一次 `python bootstrap.py --setup`。Linux/macOS 把 `Scripts/python.exe` 换成 `bin/python`。
+Run `python bootstrap.py --setup` once first. On Linux/macOS, replace `Scripts/python.exe` with `bin/python`.
 
 ## explain_actions
 
 ```bash
 python tools/rw_explain.py "path/to/unit.ini"
-python tools/rw_explain.py "path/to/unit.ini" --action scanThreatSlot   # 只看一条链
+python tools/rw_explain.py "path/to/unit.ini" --action scanThreatSlot   # single chain only
 python tools/rw_explain.py "path/to/unit.ini" --json
 ```
 
-MCP 里默认只返回文本图，要完整结构传 `fmt="json"`。
+The MCP returns the text graph by default; pass `fmt="json"` for the full structure.
 
-报这六条：
+It reports these six:
 
-| 规则 | 查什么 |
+| Rule | What it checks |
 |---|---|
-| `loop-counter` | 同一触发链上、repeat 之前有没有把循环变量复位成常量；循环体里有没有推进 |
-| `unreachable` | 动作定义了，但没入边也没触发，永远不会被调用 |
-| `uninit-memory` | `@memory` 被读了但本文件从没写过（`setUnitMemory` 和 `updateUnitMemory` 都算写） |
-| `index-bound` | 循环下标步长 > 1（跳格）或带偏移（可能越界） |
-| `trailing-comment` | 行尾 `#` 注释——引擎不剥，值会带着注释一起解析 |
-| `unresolved-edge` | `alsoTriggerAction` 指向的动作不存在 |
+| `loop-counter` | Whether the loop variable is reset to a constant before `repeat` on the same trigger chain, and whether the loop body advances it |
+| `unreachable` | The action is defined but has no inbound edge and no trigger — it will never be called |
+| `uninit-memory` | `@memory` is read but never written in this file (both `setUnitMemory` and `updateUnitMemory` count as writes) |
+| `index-bound` | Loop index step > 1 (skipping cells) or carrying an offset (possible out-of-bounds) |
+| `trailing-comment` | A `#` comment at end of line — the engine does not strip it, so the value is parsed with the comment attached |
+| `unresolved-edge` | The action referenced by `alsoTriggerAction` does not exist |
 
-运行时条件真假、运行时 `repeat`、`copyFrom` 带来的跨文件边、数组真实长度，这些它不查，会在输出末尾列出来。
+It does not check runtime condition truth values, runtime `repeat`, cross-file edges introduced by `copyFrom`, or real array lengths. These are listed at the end of the output.
 
-`lint` 的引用检查按当前单位及其本地继承链隔离，支持相对 `copyFrom`、`ROOT:`、基础 `CORE:` 和最近的
-`all-units.template`。缺失或无法展开的继承（如无法定位原版目录、动态路径）列在 `skipped`，不能视为已经验证。
-此继承支持只用于 `lint`，`explain_actions` 仍只分析单个文件。
+`lint`'s reference checks are isolated per unit and its local inheritance chain, and support relative `copyFrom`, `ROOT:`, basic `CORE:`, and the nearest
+`all-units.template`. Missing or unexpandable inheritance (e.g. the vanilla directory cannot be located, or a dynamic path) is listed under `skipped` and must not be treated as verified.
+This inheritance support applies to `lint` only; `explain_actions` still analyses a single file.
 
-## CORE: 基础支持
+## CORE: Base Support
 
-`copyFrom: CORE:tanks/tank.ini` 从游戏的 `assets/units/tanks/tank.ini` 读取原版配置，
-不是从 `mods/units` 读取。只收集继承链中的节、常量等定义用于引用检查；不会修改、复制原版文件或启动游戏。
+`copyFrom: CORE:tanks/tank.ini` reads the vanilla config from the game's `assets/units/tanks/tank.ini`,
+not from `mods/units`. It only collects definitions — sections, constants — along the inheritance chain for reference checking. It does not modify or copy vanilla files, and does not launch the game.
 
-定位顺序：CLI 的 `--core-units` 参数、`RW_CORE_UNITS` 环境变量、指定的 game-lib.jar 所在目录
-（`--jar` / `RW_GAME_JAR`）、被检查文件所在的游戏目录、常见安装位置。
-显式 `--core-units` / `RW_CORE_UNITS` 路径无效时不悄悄换到另一份游戏。
+Resolution order: the CLI's `--core-units` argument, the `RW_CORE_UNITS` environment variable, the directory of the given game-lib.jar
+(`--jar` / `RW_GAME_JAR`), the game directory of the file being checked, then common install locations.
+If an explicit `--core-units` / `RW_CORE_UNITS` path is invalid, it will not silently fall back to a different copy of the game.
 
 ```powershell
 .venv/Scripts/python.exe tools/rw_lint.py "D:/path/to/mod" --core-units "D:/path/to/game/assets/units"
-# MCP 客户端则在服务环境中设置 RW_CORE_UNITS，之后重启服务。
+# For an MCP client, set RW_CORE_UNITS in the server environment, then restart the server.
 ```
 
-- 找不到原版目录时标记未解析；目录已定位但目标缺失、不可读或越界时报告 `E17`。
-- CLI JSON 与 MCP 结果中的 `core` 列出原版目录、引用/已读取/未解析数量。
-- **`core.mode="symbols_only"` 不代表完整单位验证通过**：不计算最终键值合并与覆盖，不执行运行时表达式。
-  仍未检查的范围列在 `core.not_checked`。图片/音频中的 `CORE:`、`SHARED:` 资源路径也不在本轮范围内。
-- 相关原版文件或目录配置变化会使依赖它的检查缓存失效，不让无关单位全部重算。
+- When the vanilla directory cannot be found, it is marked unresolved; when the directory is located but the target is missing, unreadable, or out of bounds, it reports `E17`.
+- `core` in the CLI JSON and MCP results lists the vanilla directory and the referenced / read / unresolved counts.
+- **`core.mode="symbols_only"` does not mean full unit validation passed**: it does not compute the final merged and overridden key values, and does not evaluate runtime expressions.
+  What remains unchecked is listed in `core.not_checked`. `CORE:` and `SHARED:` resource paths inside images and audio are also outside this round's scope.
+- Changing the relevant vanilla files or directory configuration invalidates the cache for checks that depend on them, without recomputing unrelated units.
 
-## 命令行
+## Command Line
 
-不装 MCP 也能用：
+Usable without installing the MCP:
 
 ```bash
-python tools/rw_lint.py "D:/path/to/yourmod"            # 静态检查（自动增量）
-python tools/rw_lint.py "D:/path/to/yourmod" --timing   # 看耗时与缓存命中
-python tools/rw_lint.py "D:/path/to/yourmod" --no-cache # 强制全量
-python tools/rw_lint.py --ref                           # 速查表
-python tools/rw_lint.py --json                          # 机器可读
-python tools/rw_mcp/selftest.py                         # 自检
-python tools/game_loadtest.py "D:/path/to/yourmod"      # 进游戏加载测试（无窗口）
+python tools/rw_lint.py "D:/path/to/yourmod"            # static check (incremental by default)
+python tools/rw_lint.py "D:/path/to/yourmod" --timing   # timings and cache hits
+python tools/rw_lint.py "D:/path/to/yourmod" --no-cache # force a full run
+python tools/rw_lint.py --ref                           # quick reference
+python tools/rw_lint.py --json                          # machine-readable
+python tools/rw_mcp/selftest.py                         # self-test
+python tools/game_loadtest.py "D:/path/to/yourmod"      # in-game load test (headless)
 ```
 
-## 可选测试依赖与外部模组
+## Optional Test Dependencies and External Mods
 
-工作流 YAML 校验需要在运行测试的 Python 环境安装 `PyYAML`，例如：
+Validating the workflow YAML requires `PyYAML` in the Python environment running the tests, for example:
 
 ```powershell
 .venv/Scripts/python.exe -m pip install PyYAML
 .venv/Scripts/python.exe tests/run_tests.py
 ```
 
-真实样本 `example_test` 会依次从 `RW_TEST_MOD_ROOTS`、仓库内部、仓库旁边查找。
-其它位置可用环境变量指定多个父目录（Windows 用分号，Linux/macOS 用冒号）：
+The real sample `example_test` is looked up in `RW_TEST_MOD_ROOTS`, then inside the repository, then beside it.
+For other locations, set multiple parent directories via the environment variable (semicolon on Windows, colon on Linux/macOS):
 
 ```powershell
 $env:RW_TEST_MOD_ROOTS = "D:/path/to/collection;D:/path/to/game/mods/units"
@@ -203,43 +203,43 @@ $env:RW_TEST_MOD_ROOTS = "D:/path/to/collection;D:/path/to/game/mods/units"
 .venv/Scripts/python.exe tools/rw_mcp/selftest.py
 ```
 
-这些测试只读取模组，验证缓存前后与 CLI/MCP 的结果一致，不代表模组诊断为零，也不等于游戏加载已通过。
-`skipped` 中未展开的继承仍需单独处理；这里不会复制模组或启动游戏。
+These tests only read mods and verify that results agree before and after caching, across the CLI and the MCP. They do not mean a mod has zero diagnostics, and they do not mean the game loads it.
+Inheritance that stays unexpanded under `skipped` still needs separate handling; nothing here copies a mod or launches the game.
 
-## search_source 需要反编译
+## search_source Needs Decompilation
 
 ```bash
 python bootstrap.py --decompile
 ```
 
-需要 JDK 17+，会自动找游戏目录（或用 `--game` 指定）。不做这步 `search_source` 返回空。
+Requires JDK 17+. It finds the game directory automatically (or pass `--game`). Without this step, `search_source` returns nothing.
 
-## 数据文件
+## Data Files
 
-`references/` 下三份，缺了 `lookup_key` 查不到东西：
+Three files under `references/`; without them `lookup_key` finds nothing:
 
 - `官方代码表（Modding References）.csv`
 - `单位代码表Modding API Reference.txt`
 - `二进制键名.txt`
 
-换自己的副本：`RW_CSV` / `RW_CN`（只对 MCP 生效，`lint` 命令行不读）。
+To use your own copies: `RW_CSV` / `RW_CN` (MCP only — the `lint` CLI does not read them).
 
-## 常见问题
+## FAQ
 
-**启动失败** 看仓库根的 `bootstrap.log`。
+**Startup fails** — check `bootstrap.log` in the repository root.
 
-**装依赖失败** 多半是网络，换镜像：
+**Dependency install fails** — usually the network. Switch mirrors:
 
 ```bash
 .venv/Scripts/python -m pip install -i https://mirrors.aliyun.com/pypi/simple mcp
 ```
 
-**lint 全绿但单位不打人** 它只管语法和引用，逻辑对不对要自己跑。
+**lint is clean but the unit won't shoot** — it only covers syntax and references. Whether the logic is right is for you to test.
 
-**`lookup_key` 说的不对** 表是第三方维护的。返回里的 `agreement` 说明两张表都有还是只有一张，谁对得自己判断。
+**`lookup_key` says something wrong** — the tables are maintained by third parties. The `agreement` field in the response says whether both tables have the entry or only one; which one to trust is your call.
 
-**缓存** 在 `%LOCALAPPDATA%\rw-modding-mcp\lint`（Linux/macOS 走 `~/.cache`），`--no-cache` 或 `RW_LINT_CACHE=0` 关掉。
+**Cache** — in `%LOCALAPPDATA%\rw-modding-mcp\lint` (on Linux/macOS it follows `~/.cache`). Disable with `--no-cache` or `RW_LINT_CACHE=0`.
 
-## 许可
+## License
 
-MIT，见 `LICENSE`。`references/` 里的键名资料版权归各自作者，原作者有异议请提 issue 删除。
+MIT, see `LICENSE`. The key-name material under `references/` is copyright of its respective authors; if you are an author and object to its inclusion, open an issue and it will be removed.

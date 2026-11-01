@@ -4,7 +4,9 @@ README 只讲「现在是什么、怎么用」。改了什么记在这里。
 
 ## Unreleased
 
-- 新增 `README.en.md`（英文版 README），两份顶部互相链接。中文仍是默认首页。
+- **默认 README 改为英文**：`README.md` 是英文版，中文版移到 `README.zh-CN.md`。
+  两份第一行是语言切换 `English | 简体中文`，当前语言纯文本、另一种是链接。
+  仓库首页面向国际读者，中文读者点一下就到。
 - `tests/run_tests.py` 的 bootstrap 用例改为「找不到 bootstrap.py 就跳过」。
   原来硬编码 `ROOT/bootstrap.py`，在仓库里跑没问题，在项目根跑就红。
 
