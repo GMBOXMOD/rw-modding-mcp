@@ -4,7 +4,7 @@
 
 《铁锈战争》模组开发的 MCP 服务端，五个只读工具。
 
-仓库 `https://github.com/GMBOXMOD/rw-modding-mcp`，变更见 [CHANGELOG.md](CHANGELOG.md)。
+仓库 `https://github.com/GMBOXMOD/rw-modding-mcp`，变更见 [CHANGELOG.md](CHANGELOG.md) · English: [README.en.md](README.en.md)
 
 ## 工具
 
