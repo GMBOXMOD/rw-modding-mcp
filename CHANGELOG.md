@@ -7,6 +7,9 @@ README 只讲「现在是什么、怎么用」。改了什么记在这里。
 - **默认 README 改为英文**：`README.md` 是英文版，中文版移到 `README.zh-CN.md`。
   两份第一行是语言切换 `English | 简体中文`，当前语言纯文本、另一种是链接。
   仓库首页面向国际读者，中文读者点一下就到。
+- README 的 `FAQ` 改名为 `Troubleshooting`（中文对应「疑难排查」）。这几条讲的是
+  「出现这个现象，原因通常是这个」，不是问答对；Troubleshooting 更贴内容，
+  也更符合英文读者的检索习惯。
 - `tests/run_tests.py` 的 bootstrap 用例改为「找不到 bootstrap.py 就跳过」。
   原来硬编码 `ROOT/bootstrap.py`，在仓库里跑没问题，在项目根跑就红。
 

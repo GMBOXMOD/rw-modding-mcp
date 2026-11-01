@@ -224,7 +224,7 @@ python bootstrap.py --decompile
 
 换自己的副本：`RW_CSV` / `RW_CN`（只对 MCP 生效，`lint` 命令行不读）。
 
-## 常见问题
+## 疑难排查
 
 **启动失败** 看仓库根的 `bootstrap.log`。
 

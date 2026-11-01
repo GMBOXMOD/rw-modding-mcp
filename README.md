@@ -224,7 +224,7 @@ Three files under `references/`; without them `lookup_key` finds nothing:
 
 To use your own copies: `RW_CSV` / `RW_CN` (MCP only — the `lint` CLI does not read them).
 
-## FAQ
+## Troubleshooting
 
 **Startup fails** — check `bootstrap.log` in the repository root.
 
