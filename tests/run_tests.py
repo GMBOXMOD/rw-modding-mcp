@@ -400,6 +400,56 @@ def check_w11_builtin_names():
     return 0, 1
 
 
+def check_loadtest_log_parsing():
+    """game_loadtest 的日志解析：时间戳和探针子目录都会让错误被漏掉。
+
+    踩过两次，合起来的结果是「单位加载失败、整个模组被禁用，工具仍然报通过」：
+    1. 所有规则都用 ^ 锚定，而日志每行带 "2026-11-01 10:33:32.865: " 前缀，
+       `Error while loading unit` 一条都匹配不到。
+    2. slice_probe_section 把探针自己的子目录
+       `Note: Loading disabled mod: <probe>/defense` 当成下一个模组的开头，
+       段落被切得只剩开头几行，真正的错误全在切掉的部分里。
+    """
+    import importlib.util
+    p = os.path.join(ROOT, "tools", "game_loadtest.py")
+    if not os.path.isfile(p):
+        print("  SKIP  %-30s 找不到 tools/game_loadtest.py" % "日志解析")
+        return 0, 0
+    spec = importlib.util.spec_from_file_location("rw_loadtest", p)
+    lt = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(lt)
+
+    probe = "_probe_test"
+    log = "\n".join([
+        "2026-11-01 10:00:00.000: Loading units from mod: " + probe,
+        "2026-11-01 10:00:00.100: Note: Loading disabled mod: /x/" + probe + "/defense",
+        "2026-11-01 10:00:00.200: Note: Loading disabled mod: /x/" + probe + "/economy",
+        "2026-11-01 10:00:00.300: Error while loading unit:/x/" + probe + "/factory/a.ini",
+        "java.lang.RuntimeException: [projectile_1]areaDamage: Not a static integer: 10.5",
+        "2026-11-01 10:00:00.400: Loading units from mod: other_mod",
+        "2026-11-01 10:00:00.500: Error while loading unit:/x/other_mod/b.ini",
+    ])
+    section, ok = lt.slice_probe_section(log, probe)
+    problems = lt.parse_log(section, probe)
+    kinds = [k for k, _ in problems]
+
+    fails = []
+    if not ok:
+        fails.append("没认出探针段落")
+    if not any("a.ini" in m for _, m in problems):
+        fails.append("探针自己的错误被切掉了")
+    if any("b.ini" in m for _, m in problems):
+        fails.append("把别的模组的错误算进来了")
+    if "单位加载失败" not in kinds:
+        fails.append("没识别出「单位加载失败」")
+
+    if fails:
+        print("  FAIL  %-30s %s" % ("日志解析", "；".join(fails)))
+        return 0, 1
+    print("  PASS  %-30s 时间戳与子目录都不再吃掉错误" % "日志解析")
+    return 1, 0
+
+
 def check_workflows():
     """校验 .github/workflows/*.yml 能被 YAML 解析。
 
@@ -518,6 +568,11 @@ def main():
     w_ok, w_bad = check_w11_builtin_names()
     passed += w_ok
     failed += w_bad
+
+    print("\n-- 加载测试日志解析 --")
+    l_ok, l_bad = check_loadtest_log_parsing()
+    passed += l_ok
+    failed += l_bad
 
     print("\n-- 工作流 --")
     w_ok, w_bad = check_workflows()

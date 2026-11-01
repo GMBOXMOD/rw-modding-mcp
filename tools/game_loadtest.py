@@ -48,9 +48,15 @@ import subprocess
 
 DEFAULT_GAME = r"D:\steam\steamapps\common\Rusted Warfare"
 
+# 日志每行都带 "2026-11-01 10:33:32.865: " 前缀。ERR_PATTERNS 全部用 ^ 锚定，
+# 不先剥掉时间戳，这些规则一条都匹配不到 —— 实测漏报过
+# "Error while loading unit" 和 "Disabling mod due to error"。
+_TS = re.compile(r"^[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}[.][0-9]+: ", re.M)
+
 # 日志里这些行说明有问题
 ERR_PATTERNS = [
     (re.compile(r"^Error while loading unit:(.+)$", re.M), "单位加载失败"),
+    (re.compile(r"^Disabling mod due to error: (.+)$", re.M), "模组被禁用（有单位加载失败）"),
     (re.compile(r"^Adding error for mod:.*?: (.+)$", re.M), "模组错误"),
     (re.compile(r"^alert:Error loading mod '([^']*)': (.+)$", re.M), "模组加载失败"),
     (re.compile(r"^(\S*(?:Exception|Error): .+)$", re.M), "引擎异常"),
@@ -115,26 +121,37 @@ def slice_probe_section(text, probe_name):
 
     否则会把用户自己那些模组的错误也报进来 —— 第一次跑就被 151 条
     别人模组的错误淹了。
+
+    ★ 边界判断必须排除探针自己的行：游戏会把探针的每个子目录也记成
+    `Note: Loading disabled mod: .../<probe>/defense`。旧实现把这些当成
+    「下一个模组」的开头，段落被切得只剩开头几行，真正的
+    `Error while loading unit` 全在切掉的部分里 —— 于是永远报「通过」。
     """
-    pats = [r"Loading units from mod: " + re.escape(probe_name),
-            r"Note: Loading disabled mod: .*" + re.escape(probe_name) + r"/units"]
-    start = -1
-    for pat in pats:
-        m = re.search(pat, text)
-        if m:
-            start = m.start()
+    lines = text.split("\n")
+    begin = None
+    for i, ln in enumerate(lines):
+        if probe_name in ln and ("Loading units from mod: " in ln
+                                 or "Note: Loading disabled mod: " in ln):
+            begin = i
             break
-    if start < 0:
+    if begin is None:
         return text, False
 
-    tail = text[start + 1:]
-    nxt = re.search(r"(?:Loading units from mod: |Note: Loading disabled mod: )", tail)
-    end = start + 1 + nxt.start() if nxt else len(text)
-    return text[start:end], True
+    finish = len(lines)
+    for j in range(begin + 1, len(lines)):
+        ln = lines[j]
+        if probe_name in ln:
+            continue                      # 探针自己的子目录，属于本段
+        if "Loading units from mod: " in ln or "Note: Loading disabled mod: " in ln:
+            finish = j
+            break
+    return "\n".join(lines[begin:finish]), True
 
 
 def parse_log(text, probe_name):
     problems = []
+    text = _TS.sub("", text)
+
     seen = set()
 
     # 探针模组是否被禁用 —— 后门模式下这是预期的，只在没开成功时才提示
@@ -198,7 +215,10 @@ def main():
     prefs_backup = prefs + ".loadtestbak"
 
     try:
-        shutil.copytree(mod, probe_dir)
+        # 跳过版本库和编辑器目录：它们会被游戏当成"子模组"逐个枚举，
+        # 一个 .git 就能刷出上千行 "Loading disabled mod: .../.git/objects/xx"。
+        shutil.copytree(mod, probe_dir, ignore=shutil.ignore_patterns(
+            ".git", "__pycache__", ".claude", ".vscode", ".idea", "*.log", "*.pyc"))
     except Exception as e:
         print(f"[环境] 复制模组失败：{e}", file=sys.stderr)
         return 2

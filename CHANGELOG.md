@@ -4,6 +4,19 @@ README 只讲「现在是什么、怎么用」。改了什么记在这里。
 
 ## Unreleased
 
+- **game_loadtest 漏报修复（严重）**：单位加载失败、整个模组被禁用时，工具仍然报「加载通过」。
+  两个原因叠加：
+  1. `ERR_PATTERNS` 全部用 `^` 锚定，而日志每行带 `2026-11-01 10:33:32.865: ` 前缀，
+     `Error while loading unit` 一条都匹配不到。改为匹配前先剥时间戳。
+  2. `slice_probe_section` 把探针**自己的子目录**
+     `Note: Loading disabled mod: <probe>/defense` 当成「下一个模组」的开头，
+     段落被切得只剩开头几行，真正的错误全在切掉的部分里。改成只有「不含探针名的行」才算边界。
+  实测：故意把一个 `areaDamage` 写成小数，旧版报通过，新版报出 6 条问题（含模组被禁用）。
+- 补 `Disabling mod due to error` 规则；探针复制时跳过 `.git` / `.claude` / `.vscode`
+  （一个 `.git` 就能刷出上千行 `Loading disabled mod: .../.git/objects/xx`）。
+- 新增回归 `check_loadtest_log_parsing`：喂一段带时间戳、带探针子目录、带别的模组错误的日志，
+  断言探针自己的错误被抓到、别人的错误不被算进来。
+
 - **技能里的指南拆成 12 册**：`skill/references/铁锈战争模组开发Agent指南.md`（4046 行 / 220 KB 单文件）
   拆成 `skill/references/guide/` 下的 12 个文件 + 一个索引。最大单册 40.7 KB。
   原来要读第 3 章得把 4000 行全读进来；现在只读 `03-luke语运行时脚本.md`（572 行）。
