@@ -31,7 +31,7 @@ The local lint cache only saves checking time — it is not the model's prompt c
 | File | Contents |
 |---|---|
 | `skill/SKILL.md` | Division of labour, workflow, hard-fact checklist, lint rule-number reference |
-| `skill/references/铁锈战争模组开发Agent指南.md` | Full development guide (9 chapters + appendices) |
+| `skill/references/guide/` | Full development guide, split into 12 volumes (ch. 0–8 + appendices A/B/C). Start at `guide/README.md` for the index. |
 | `skill/references/反编译发现_运行时语义.md` | Implementation-level facts obtained by decompilation |
 | `skill/references/反编译_字段对照表.md` | Obfuscated field → luke key mapping |
 | `skill/references/锁步联机与动态帧率补偿.md` | Multiplayer / lockstep / frame-rate specifics |

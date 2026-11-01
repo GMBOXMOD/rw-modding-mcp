@@ -31,7 +31,7 @@
 | 文件 | 内容 |
 |---|---|
 | `skill/SKILL.md` | 分工说明、工作流程、硬事实清单、lint 规则号速查 |
-| `skill/references/铁锈战争模组开发Agent指南.md` | 完整开发指南（9 章 + 附录） |
+| `skill/references/guide/` | 完整开发指南，拆成 12 册（第 0–8 章 + 附录 A/B/C）。入口是 `guide/README.md` 索引。 |
 | `skill/references/反编译发现_运行时语义.md` | 反编译得到的实现层事实 |
 | `skill/references/反编译_字段对照表.md` | 混淆字段 → luke 键 |
 | `skill/references/锁步联机与动态帧率补偿.md` | 联机 / 锁步 / 帧率专项 |
