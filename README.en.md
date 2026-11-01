@@ -1,10 +1,12 @@
+English | [简体中文](README.md)
+
 # Rusted Warfare Modding MCP
 
 [![M8ven Score](https://m8ven.ai/badge/mcp/gmboxmod-rw-modding-mcp-193cu7?v=6d952b5c688774a21da25c611d40cb66)](https://m8ven.ai/mcp/gmboxmod-rw-modding-mcp-193cu7?s=readme)
 
 An MCP server for Rusted Warfare mod development. Five read-only tools.
 
-Repository: `https://github.com/GMBOXMOD/rw-modding-mcp` · Changes: [CHANGELOG.md](CHANGELOG.md) · 中文版: [README.md](README.md)
+Repository: `https://github.com/GMBOXMOD/rw-modding-mcp` · Changes: [CHANGELOG.md](CHANGELOG.md)
 
 ## Tools
 
