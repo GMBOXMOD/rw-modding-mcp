@@ -450,6 +450,51 @@ def check_loadtest_log_parsing():
     return 1, 0
 
 
+def check_attach_slicing():
+    """attach 模式：运行中实例的热重载日志要按「块」筛，不能逐行筛。
+
+    踩过的坑：逐行判断 `mod_name in ln`，会把别的模组的异常消息
+    （`java.lang.RuntimeException: ...` 这种不带模组名的续行）也收进来，
+    于是玩家自己开的游戏里别的模组报错，会被算到被测模组头上。
+
+    正确做法：块 = 一条带时间戳的行 + 其后所有无时间戳的行，
+    归属只看块首。所以这里断言「本模组的栈要留下，别人的异常要丢掉」。
+    """
+    import importlib.util
+    p = os.path.join(ROOT, "tools", "game_loadtest.py")
+    if not os.path.isfile(p):
+        print("  SKIP  %-30s 找不到 tools/game_loadtest.py" % "attach 切片")
+        return 0, 0
+    spec = importlib.util.spec_from_file_location("rw_loadtest_attach", p)
+    lt = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(lt)
+
+    log = "\n".join([
+        "2026-11-08 00:10:00.000: Detected unit changes",
+        "2026-11-08 00:10:00.200: Error while loading unit:/SD/mods/units/Mine/factory/a.ini",
+        "com.corrodinggames.rts.game.units.custom.bo: Failed to find custom effect with the name:x",
+        "\tat com.corrodinggames.rts.game.units.custom.l.d(SourceFile:1391)",
+        "2026-11-08 00:10:00.300: Error while loading unit:/SD/mods/units/Other/a.ini",
+        "java.lang.RuntimeException: other mod boom",
+    ])
+    problems = lt.parse_log(lt.slice_mod_section(log, "Mine"), "Mine")
+    msgs = [m for _, m in problems]
+
+    fails = []
+    if not any("custom effect" in m for m in msgs):
+        fails.append("本模组的异常消息被丢了")
+    if any("other mod boom" in m for m in msgs):
+        fails.append("把别的模组的异常算进来了")
+    if not any("Mine" in m for m in msgs):
+        fails.append("本模组的报错路径被丢了")
+
+    if fails:
+        print("  FAIL  %-30s %s" % ("attach 切片", "；".join(fails)))
+        return 0, 1
+    print("  PASS  %-30s 按日志块筛，别人的错误不会串台" % "attach 切片")
+    return 1, 0
+
+
 def check_workflows():
     """校验 .github/workflows/*.yml 能被 YAML 解析。
 
@@ -573,6 +618,10 @@ def main():
     l_ok, l_bad = check_loadtest_log_parsing()
     passed += l_ok
     failed += l_bad
+
+    a_ok, a_bad = check_attach_slicing()
+    passed += a_ok
+    failed += a_bad
 
     print("\n-- 工作流 --")
     w_ok, w_bad = check_workflows()
