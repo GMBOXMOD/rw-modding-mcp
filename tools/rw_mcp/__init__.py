@@ -5,4 +5,4 @@
 实现在 impl.py，服务接线在 tools/rw_mcp_server.py。
 """
 
-__version__ = "1.0.0"
+__version__ = "0.2.0"
