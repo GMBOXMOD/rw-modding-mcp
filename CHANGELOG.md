@@ -4,119 +4,32 @@ README 只讲「现在是什么、怎么用」。改了什么记在这里。
 
 ## v0.2.0 — 2026-11-08
 
-**里程碑：测试不再需要启动游戏。**
+**里程碑：测试不再需要启动游戏。** 游戏开着时 `game_loadtest` 直接读运行中实例的
+`lastrun.log` 增量，测试从「10–20 秒冷启动 + 复制整个模组 + 改 preferences.ini」降到秒级。
 
-游戏开着时 `game_loadtest` 直接读运行中实例的日志增量，测试从「10–20 秒冷启动 +
-复制整个模组 + 改 preferences.ini」降到秒级；配合 SKILL.md 按改动类型判定，
-日常改动的验证成本大幅下降。反馈原话：「他要是能直接用我目前的进程 DEBUG 那能快很多」。
+### What's Changed
+* README 只留用法：206 行 -> 134 行 by @GMBOXMOD
+* explain_actions 不再把玩家按钮报成「不可达」 by @GMBOXMOD
+* 收紧 MCP 返回体积：lint 少 70%，explain_actions 少 78% by @GMBOXMOD
+* lookup_key 支持批量：一次查多个键，减少往返 by @GMBOXMOD
+* 修复静态检查并优化定向查询与 CORE 基础继承 by @GMBOXMOD
+* 测试：bootstrap 用例在非仓库目录下跳过而不是失败 by @GMBOXMOD
+* Revise README for example test and paths by @GMBOX
+* 修两类误报：触发通道键、canBuild 指向原版单位 by @GMBOXMOD
+* game_loadtest：补上混淆类名的异常匹配 by @GMBOXMOD
+* README：加 M8ven 评分徽章 by @GMBOXMOD
+* 收录配套技能（skill/） by @GMBOXMOD
+* W10 收紧：只报会随运行期变化的 ${}，并修掉 strip_runtime_blocks 吞右括号 by @GMBOXMOD
+* 新增英文版 README（README.en.md） by @GMBOXMOD
+* 语言切换挪到 README 最顶部，用 English | 简体中文 by @GMBOXMOD
+* 默认 README 改为英文，中文移到 README.zh-CN.md by @GMBOXMOD
+* README：FAQ 改名为 Troubleshooting by @GMBOXMOD
+* 技能里的指南拆成 12 册 by @GMBOXMOD
+* game_loadtest：修掉「单位加载失败却报通过」的漏报 by @GMBOXMOD
+* game_loadtest：加 attach 模式，游戏开着时不再冷启动 by @GMBOXMOD
 
-- **game_loadtest 新增 attach 模式（默认）**：游戏开着时不再冷启动，直接读运行中实例的
-  `lastrun.log` 增量。运行中的实例自带 `FileChangeEngine`，模组文件一变就重新解析并写日志，
-  报错格式和冷启动一致 —— 于是测试从「10–20 秒 + 复制整个模组 + 改 preferences.ini」
-  降到「读文件，秒级」。
-  - `--mode auto|attach|headless`，auto 检测到游戏进程就走 attach。
-  - 只认 GUI 客户端进程，不会把自己起的 `java -nodisplay` 误判成"游戏在跑"。
-  - 日志按**块**筛（带时间戳的行 + 其后所有续行），归属只看块首 ——
-    逐行筛会把别的模组的异常消息也收进来。
-  - 增量偏移存 `.loadtest_attach.json`，第二次跑不会重复报旧错误；日志被截断（游戏重启）自动从头算。
-  - ⚠️ 热重载可能读到写了一半的文件（引用已加、定义未加）。工具会把「2 秒内被改过的 `.ini`」
-    标出来提示重跑 —— 这个假错实测踩过，害我误判过一次。
-- **game_loadtest 自愈清理**：11-01 那次跑到一半被打断，`finally` 没执行，留下
-  `mods/units/_probe_*` 和一个没还原的 `loadDisabledModData:true`（会让游戏一直解析
-  被禁用模组的单位）。现在每次开跑前会清理：还原 `.loadtestbak`、删 1 小时以上的残留探针和日志。
-- **SKILL.md 把 loadtest 从「每轮必做」改成按改动类型判定**：只有新增/删除单位文件、
-  新增 `[effect_*]`/`[projectile_*]`/`[turret_*]`、改 `copyFrom` 链、改资源路径才必须跑；
-  纯数值、文案、注释改动 `lint` 够用。反馈里「测试频率还是高了吧」的根因就是这一步被写成了固定动作。
-- 新增回归 `check_attach_slicing`：断言按块筛能留下本模组的栈、丢掉别的模组的异常。
-
-- **game_loadtest 漏报修复（严重）**：单位加载失败、整个模组被禁用时，工具仍然报「加载通过」。
-  两个原因叠加：
-  1. `ERR_PATTERNS` 全部用 `^` 锚定，而日志每行带 `2026-11-01 10:33:32.865: ` 前缀，
-     `Error while loading unit` 一条都匹配不到。改为匹配前先剥时间戳。
-  2. `slice_probe_section` 把探针**自己的子目录**
-     `Note: Loading disabled mod: <probe>/defense` 当成「下一个模组」的开头，
-     段落被切得只剩开头几行，真正的错误全在切掉的部分里。改成只有「不含探针名的行」才算边界。
-  实测：故意把一个 `areaDamage` 写成小数，旧版报通过，新版报出 6 条问题（含模组被禁用）。
-- 补 `Disabling mod due to error` 规则；探针复制时跳过 `.git` / `.claude` / `.vscode`
-  （一个 `.git` 就能刷出上千行 `Loading disabled mod: .../.git/objects/xx`）。
-- 新增回归 `check_loadtest_log_parsing`：喂一段带时间戳、带探针子目录、带别的模组错误的日志，
-  断言探针自己的错误被抓到、别人的错误不被算进来。
-
-- **技能里的指南拆成 12 册**：`skill/references/铁锈战争模组开发Agent指南.md`（4046 行 / 220 KB 单文件）
-  拆成 `skill/references/guide/` 下的 12 个文件 + 一个索引。最大单册 40.7 KB。
-  原来要读第 3 章得把 4000 行全读进来；现在只读 `03-luke语运行时脚本.md`（572 行）。
-  SKILL.md 的「参考文件」改成路由表：分册 → 什么时候读。
-  拆的时候内容逐行校验过，只有 12 个 `## N.` 标题换成了 H1，正文一行没动。
-  顺带修好了一直坏着的目录——原文第 18–26 行是 9 个空的 `-`，章节标题早就丢了。
-- **默认 README 改为英文**：`README.md` 是英文版，中文版移到 `README.zh-CN.md`。
-  两份第一行是语言切换 `English | 简体中文`，当前语言纯文本、另一种是链接。
-  仓库首页面向国际读者，中文读者点一下就到。
-- README 的 `FAQ` 改名为 `Troubleshooting`（中文对应「疑难排查」）。这几条讲的是
-  「出现这个现象，原因通常是这个」，不是问答对；Troubleshooting 更贴内容，
-  也更符合英文读者的检索习惯。
-- `tests/run_tests.py` 的 bootstrap 用例改为「找不到 bootstrap.py 就跳过」。
-  原来硬编码 `ROOT/bootstrap.py`，在仓库里跑没问题，在项目根跑就红。
-
-CORE: 基础支持
-
-- `lint` 能从原版 `assets/units` 读取 `copyFrom: CORE:` 的定义；支持自动定位、`RW_CORE_UNITS` 与 CLI `--core-units`。
-- 原版目录不可用时明确未完成；目标缺失、不可读或路径越界报告 E17。不修改或复制原版配置。
-- 返回 `core.mode=symbols_only` 和未检查范围，不把定义解析当作完整的继承合并或运行时验证。
-- 原版目录和继承文件指纹加入相关单位的缓存依赖；新增 12 项回归及不依赖游戏安装的 MCP 协议样本。
-
-可选外部测试
-
-- 真实模组样本支持从 `RW_TEST_MOD_ROOTS`、仓库内部与仓库旁边定位，不再因为样本在相邻目录而跳过。
-- 外部模组可能独立变更，工具自检改为比较 CLI/MCP 计数；固定 fixtures 继续断言精确规则。
-  缓存一致性测试同时要求执行成功，并展示未展开/跳过数量，不把不完整分析冒充完整验证。
-- 新增 3 项外部样本定位测试，并补充 PyYAML 安装与外部模组配置说明。
-
-定向查询与上下文控制（第一轮）
-
-- `lookup_key` 默认短输出，支持 `section` 和 `detail=full`。短输出保留约束、资料冲突、来源和重要说明；
-  原始 `csv` / `cn` 数组仅在 full 模式返回，旧参数顺序不变。批量去重并限制为 32 个不同键。
-- CSV 条目保留所属节，同名键按节筛选，避免把其它节的版本/类型混进来。
-- `search_source` 增加 literal/regex 明确模式、最多 8 词批量、有限上下文、offset 分页和字符预算。
-  默认最多 10 条结果；旧 regex 布尔参数仍可用。空结果区分无源码、路径无文件与无命中，提示常见模式误用。
-- `get_ref` 可按 topic/name 查询已有速查数据，无参数保持完整返回；未知条目不冒充引擎不支持。
-- 新增 27 项定向查询回归；真实 stdio 协议测试使用合成源码，并检查实际返回字符数、分页和旧参数兼容。
-- 修正文档中“每次都重发整个上下文，所以必然更省钱”的笼统说法：本地缓存、模型缓存、返回体积和请求预算分开说明。
-
-静态分析正确性
-
-- `lint` 不再用整个目录的节/常量判断单个单位的引用。按本文件、本地 `copyFrom`
-  继承链和最近的 `all-units.template` 建立作用域；其它单位的同名节不会再掩盖缺失引用。
-- 扫描范围外的本地模板也参与引用解析与缓存校验；缺失或无法展开的继承列入 `skipped`。
-- 单行和多行三引号值统一解析，块内的 memory 表达式不再跳过检查；独立块注释不作为代码。
-  `lint` 与 `explain_actions` 共用逻辑行解析，并正确处理 CRLF。
-- 插值括号按逻辑值独立配对，修复 `${x} ${y` 漏报未闭合以及不同配置行互相抵消的问题。
-- `explain_actions` 记录触发条件、门控、repeat 和赋值下标中的 memory 读取，支持条件里的
-  `readUnitMemory(...)`；按钮动作作为默认入口展开，不再被列为未引用链。
-- 修复启动器标记测试多拼一层目录的问题，导入失败改为 FAIL 而非静默 SKIP。
-- 新增 29 项标准库回归测试，覆盖引用隔离、本地继承、外部模板缓存失效、三引号、插值和动作图。
-
-MCP 往返次数
-
-- `lookup_key` 支持 `keys=[...]` 批量查询。写一个单位通常要查七八个键，
-  逐个查就是七八次往返，而每次往返都要把整个上下文重发一遍 ——
-  单次返回只有几百 token，重发的是十万级的上下文。
-  批量后内容不变（2357 vs 2310 token），往返从 6 次降到 1 次。
-- `lint` 上一版已有 `paths` 批量，这次配套补齐。
-
-MCP 返回体积
-
-- `lint` 的 issues 不再每条重复完整绝对路径。改成 `issue_files` 表 + 下标 `f`，
-  路径只出现一次。实测 FanWar（1037 文件、4063 条问题）从 17592 token 降到 5181。
-- `lint` 默认 `max_issues` 从 200 降到 100，并新增 `by_code` 汇总 ——
-  被截断时也能看出问题分布，决定要不要缩小范围再查。
-- `explain_actions` 默认只返回文本图（`fmt="text"`），不再同时给 `text` 和整份 `nodes`。
-  同一张图付两遍钱，实测 3078 → 683 token。要完整结构传 `fmt="json"` 或 `"both"`。
-- 新增体积回归测试：给三类调用钉了 token 上限，并断言 issues 里不能再出现路径字段。
-
-文档
-
-- README 只留用法，206 行 → 134 行。性能一节、局限一节、目录结构、法务说明、
-  示例输出全部移出，两条会影响判断的局限挪进常见问题。
+> 每一条的「为什么」在对应提交信息里。本版早于 PR 流程，所以还没有 PR 编号；
+> 从 v0.2.1 起由 `tools/gen_changelog.py` 自动带上。
 
 ## v0.1.0 — 2026-10-23
 

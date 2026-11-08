@@ -495,6 +495,46 @@ def check_attach_slicing():
     return 1, 0
 
 
+def check_gen_changelog():
+    """gen_changelog 的解析契约：PR 标题行 + 噪声过滤。
+
+    发布说明靠「squash 合并后提交信息是 `标题 (#123)`」还原 PR 编号。
+    这个格式一旦变了（比如 GitHub 改了后缀、或者有人手写了 `(#12) fix`），
+    发布说明就会静默退化成没有编号的裸列表 —— 所以钉死在这里。
+    """
+    import importlib.util
+    p = os.path.join(ROOT, "tools", "gen_changelog.py")
+    if not os.path.isfile(p):
+        print("  SKIP  %-30s 找不到 tools/gen_changelog.py" % "changelog 解析")
+        return 0, 0
+    spec = importlib.util.spec_from_file_location("rw_genlog", p)
+    gl = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(gl)
+
+    fails = []
+
+    m = gl.PR_RE.match("game_loadtest：加 attach 模式 (#12)")
+    if not m or m.group("title") != "game_loadtest：加 attach 模式" or m.group("num") != "12":
+        fails.append("标准 squash 标题没解析出来")
+
+    if gl.PR_RE.match("foo (#12) 后面还有字"):
+        fails.append("尾部带杂字的标题不该被当成 PR 行")
+
+    for s in ("Merge pull request #3 from a/b", "chore: bump deps",
+              "CHANGELOG：Unreleased 段落改挂到 v0.2.0", "Revert \"x\""):
+        if not any(pat.search(s) for pat in gl.SKIP_PATTERNS):
+            fails.append("噪声没被过滤：%s" % s)
+
+    if any(pat.search("game_loadtest：加 attach 模式") for pat in gl.SKIP_PATTERNS):
+        fails.append("正常提交被误过滤")
+
+    if fails:
+        print("  FAIL  %-30s %s" % ("changelog 解析", "；".join(fails)))
+        return 0, 1
+    print("  PASS  %-30s PR 标题与噪声过滤都符合契约" % "changelog 解析")
+    return 1, 0
+
+
 def check_workflows():
     """校验 .github/workflows/*.yml 能被 YAML 解析。
 
@@ -622,6 +662,10 @@ def main():
     a_ok, a_bad = check_attach_slicing()
     passed += a_ok
     failed += a_bad
+
+    c_ok, c_bad = check_gen_changelog()
+    passed += c_ok
+    failed += c_bad
 
     print("\n-- 工作流 --")
     w_ok, w_bad = check_workflows()
